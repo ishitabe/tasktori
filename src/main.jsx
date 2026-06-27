@@ -3,11 +3,15 @@ import { createRoot } from 'react-dom/client';
 import {
   ArrowUpDown,
   ArrowLeft,
+  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Cloud,
   Download,
+  Ellipsis,
   FileText,
+  Flag,
   History,
   ListChecks,
   Notebook,
@@ -25,13 +29,15 @@ import {
 import './styles.css';
 
 const TASKS_KEY = 'tasktori.tasks.v1';
-const APP_KEY = 'tasktori.app.v2';
+const LEGACY_APP_KEY = 'tasktori.app.v2';
+const APP_KEY = 'tasktori.app.v3';
 const UI_KEY = 'tasktori.ui.v2';
 const HISTORY_LIMIT = 100;
 const COMPLETE_ANIMATION_MS = 520;
 const BLAST_ANIMATION_MS = 980;
 
 const DEFAULT_LIST_ID = 'main';
+const PRIORITIES = [1, 2, 3, 4];
 
 let audioContext;
 
@@ -94,7 +100,14 @@ const createSubtask = (title) => {
   return { id: makeId(), title, done: false, createdAt: now, updatedAt: now };
 };
 
-const createTask = ({ title, deadline = null, subtasks = [], listId = DEFAULT_LIST_ID, priority = 0 }) => {
+const normalizePriority = (priority, legacy = false) => {
+  if (!Number.isInteger(priority)) return 2;
+  if (legacy && priority >= 0 && priority <= 3) return priority + 1;
+  if (priority >= 1 && priority <= 4) return priority;
+  return 2;
+};
+
+const createTask = ({ title, deadline = null, subtasks = [], listId = DEFAULT_LIST_ID, priority = 2 }) => {
   const now = nowIso();
   return {
     id: makeId(),
@@ -129,11 +142,11 @@ const normalizeSubtask = (subtask) => ({
   updatedAt: subtask.updatedAt || nowIso(),
 });
 
-const normalizeTask = (task) => ({
+const normalizeTask = (task, options = {}) => ({
   id: task.id || makeId(),
   title: task.title || '',
   done: Boolean(task.done),
-  priority: Number.isInteger(task.priority) ? Math.max(0, Math.min(3, task.priority)) : 0,
+  priority: normalizePriority(task.priority, options.legacyPriority),
   deadline: task.deadline || null,
   memo: task.memo || '',
   subtasks: Array.isArray(task.subtasks) ? task.subtasks.map(normalizeSubtask) : [],
@@ -173,11 +186,24 @@ const loadData = () => {
       };
     }
 
+    const legacyAppRaw = localStorage.getItem(LEGACY_APP_KEY);
+    if (legacyAppRaw) {
+      const parsed = JSON.parse(legacyAppRaw);
+      const lists = Array.isArray(parsed.lists) && parsed.lists.length > 0
+        ? parsed.lists.map(normalizeList)
+        : [{ id: DEFAULT_LIST_ID, title: 'メイン', createdAt: nowIso(), updatedAt: nowIso() }];
+      return {
+        tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map((task) => ({ ...normalizeTask(task, { legacyPriority: true }), listId: task.listId || lists[0].id })) : [],
+        memos: Array.isArray(parsed.memos) ? parsed.memos.map(normalizeMemo) : [],
+        lists,
+      };
+    }
+
     const oldTasks = localStorage.getItem(TASKS_KEY);
     if (oldTasks) {
       const parsed = JSON.parse(oldTasks);
       return {
-        tasks: Array.isArray(parsed) ? parsed.map((task) => ({ ...normalizeTask(task), listId: DEFAULT_LIST_ID })) : [],
+        tasks: Array.isArray(parsed) ? parsed.map((task) => ({ ...normalizeTask(task, { legacyPriority: true }), listId: DEFAULT_LIST_ID })) : [],
         memos: [],
         lists: [{ id: DEFAULT_LIST_ID, title: 'メイン', createdAt: nowIso(), updatedAt: nowIso() }],
       };
@@ -193,10 +219,11 @@ const loadUi = () => {
       activeTab: ['tasks', 'memos', 'settings'].includes(parsed.activeTab) ? parsed.activeTab : 'tasks',
       currentListId: parsed.currentListId || DEFAULT_LIST_ID,
       todayOnly: Boolean(parsed.todayOnly),
+      taskFilter: ['all', 'today', 'overdue', 'deadline', 'none', 'done'].includes(parsed.taskFilter) ? parsed.taskFilter : 'all',
       sortBy: parsed.sortBy === 'created' || parsed.sortBy?.today === 'created' ? 'created' : 'recommended',
     };
   } catch {
-    return { activeTab: 'tasks', currentListId: DEFAULT_LIST_ID, todayOnly: false, sortBy: 'recommended' };
+    return { activeTab: 'tasks', currentListId: DEFAULT_LIST_ID, todayOnly: false, taskFilter: 'all', sortBy: 'recommended' };
   }
 };
 
@@ -388,9 +415,9 @@ const collectTimeCandidates = (text) =>
 
 const collectPriorityCandidates = (text) =>
   [
-    ...collectMatches(text, /優先度\s*([0-3])/g, (match) => ({ priority: Number(match[1]), raw: match[0], kind: 'priority' })),
+    ...collectMatches(text, /優先度\s*([1-4])/g, (match) => ({ priority: Number(match[1]), raw: match[0], kind: 'priority' })),
     ...collectMatches(text, /(?:^|[\s　])([高中低])(?:$|[\s　])/g, (match) => ({
-      priority: match[1] === '高' ? 3 : match[1] === '中' ? 2 : 1,
+      priority: match[1] === '高' ? 4 : match[1] === '中' ? 3 : 1,
       raw: match[1],
       index: (match.index ?? 0) + match[0].indexOf(match[1]),
       kind: 'priority',
@@ -410,7 +437,7 @@ const compactTitle = (text) =>
 
 const analyzeTaskLine = (line, baseDate = new Date()) => {
   const original = line.trim();
-  if (!original) return { title: '', deadline: null, priority: 0, matches: [], humanDeadline: '' };
+  if (!original) return { title: '', deadline: null, priority: 2, matches: [], humanDeadline: '' };
   const analysisText = normalizeAnalysisText(original);
 
   const dateCandidates = collectDateCandidates(analysisText, baseDate).map((candidate) => ({
@@ -455,7 +482,7 @@ const analyzeTaskLine = (line, baseDate = new Date()) => {
   return {
     title,
     deadline,
-    priority: priorityPart?.priority ?? 0,
+    priority: priorityPart?.priority ?? 2,
     matches,
     humanDeadline: deadline ? formatHumanDeadline(deadline) : '',
   };
@@ -503,6 +530,18 @@ const taskGroupRank = (task) => {
   if (deadline < now) return 0;
   if (deadline <= endOfDay(now)) return 1;
   return 2;
+};
+
+const isTodayOrOverdue = (task) =>
+  Boolean(task.deadline && new Date(task.deadline) < startOfDay(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1)));
+
+const taskMatchesFilter = (task, filter) => {
+  if (filter === 'today') return isTodayOrOverdue(task);
+  if (filter === 'overdue') return Boolean(task.deadline && new Date(task.deadline) < new Date());
+  if (filter === 'deadline') return Boolean(task.deadline);
+  if (filter === 'none') return !task.deadline;
+  if (filter === 'done') return Boolean(task.done);
+  return true;
 };
 
 const sortTasks = (tasks, sortBy) =>
@@ -558,6 +597,9 @@ function App() {
   const [blasting, setBlasting] = useState(false);
   const [memoBlasting, setMemoBlasting] = useState(false);
   const [memoSearch, setMemoSearch] = useState('');
+  const [memoDraft, setMemoDraft] = useState(null);
+  const [taskSelectMode, setTaskSelectMode] = useState(false);
+  const [taskSelection, setTaskSelection] = useState(() => new Set());
   const [memoSelection, setMemoSelection] = useState(() => new Set());
   const [memoSelectMode, setMemoSelectMode] = useState(false);
   const [swipeStart, setSwipeStart] = useState(null);
@@ -570,12 +612,11 @@ function App() {
   const visibleTasks = useMemo(() => {
     const active = tasks.filter((task) => {
       const inCurrentList = task.listId === currentList?.id;
-      const activeTask = !task.done || completingIds.has(task.id);
-      const dueToday = task.deadline && new Date(task.deadline) < startOfDay(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1));
-      return inCurrentList && activeTask && (!ui.todayOnly || dueToday);
+      const activeTask = ui.taskFilter === 'done' || !task.done || completingIds.has(task.id);
+      return inCurrentList && activeTask && taskMatchesFilter(task, ui.todayOnly ? 'today' : ui.taskFilter);
     });
     return sortTasks(active, ui.sortBy);
-  }, [tasks, completingIds, currentList?.id, ui.todayOnly, ui.sortBy]);
+  }, [tasks, completingIds, currentList?.id, ui.todayOnly, ui.taskFilter, ui.sortBy]);
 
   const filteredMemos = useMemo(() => {
     const query = memoSearch.trim().toLowerCase();
@@ -598,10 +639,16 @@ function App() {
   }, [route, selectedTask, selectedMemo]);
 
   const mutateData = (updater) => dispatch({ type: 'APPLY', updater });
-  const switchTab = (activeTab) => {
+  const switchTab = (activeTab, memoDraft = null) => {
+    if (route.name === 'memoEdit' && memoDraft) {
+      saveMemo(memoDraft.memoId, memoDraft.body, activeTab);
+      return;
+    }
     setUi((current) => ({ ...current, activeTab }));
     setRoute({ name: activeTab });
     setAdding(false);
+    setTaskSelectMode(false);
+    setTaskSelection(new Set());
     setMemoSelectMode(false);
     setMemoSelection(new Set());
   };
@@ -620,6 +667,7 @@ function App() {
     mutateData((draft) => ({ ...draft, lists: [...draft.lists, list] }));
     setUi((current) => ({ ...current, currentListId: list.id, todayOnly: false }));
     setAdding(false);
+    return list;
   };
   const renameTaskList = (listId, title) => {
     const nextTitle = title.trim();
@@ -632,7 +680,6 @@ function App() {
   const deleteTaskList = (listId) => {
     const target = lists.find((list) => list.id === listId);
     if (!target || target.id === DEFAULT_LIST_ID || lists.length <= 1) return;
-    if (!window.confirm(`${target.title}を削除しますか？この一覧内のタスクも削除されます。`)) return;
     const currentIndex = lists.findIndex((list) => list.id === listId);
     const nextList = lists[currentIndex + 1] || lists[currentIndex - 1] || lists.find((list) => list.id === DEFAULT_LIST_ID);
     mutateData((draft) => ({
@@ -664,6 +711,23 @@ function App() {
     mutateData((draft) => ({ ...draft, tasks: draft.tasks.filter((task) => task.id !== taskId) }));
     setRoute({ name: 'tasks' });
   };
+  const duplicateTask = (taskId) => {
+    const source = tasks.find((task) => task.id === taskId);
+    if (!source) return;
+    const now = nowIso();
+    const copy = {
+      ...clone(source),
+      id: makeId(),
+      title: `${source.title} コピー`,
+      done: false,
+      subtasks: source.subtasks.map((subtask) => ({ ...subtask, id: makeId(), done: false, createdAt: now, updatedAt: now })),
+      expanded: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    mutateData((draft) => ({ ...draft, tasks: [...draft.tasks, copy] }));
+    setRoute({ name: 'taskDetail', taskId: copy.id });
+  };
   const completeTask = (task) => {
     if (task.done || completingIds.has(task.id)) return;
     playCompleteSound();
@@ -690,6 +754,47 @@ function App() {
       setBlasting(false);
     }, BLAST_ANIMATION_MS);
   };
+  const toggleTaskSelection = (taskId) => {
+    setTaskSelection((current) => {
+      const next = new Set(current);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+  const selectAllVisibleTasks = () => {
+    setTaskSelection(new Set(visibleTasks.map((task) => task.id)));
+  };
+  const deleteSelectedTasks = () => {
+    if (taskSelection.size === 0) return;
+    const ids = new Set(taskSelection);
+    mutateData((draft) => ({ ...draft, tasks: draft.tasks.filter((task) => !ids.has(task.id)) }));
+    setTaskSelection(new Set());
+    setTaskSelectMode(false);
+  };
+  const moveSelectedTasks = (listId) => {
+    if (taskSelection.size === 0) return;
+    const ids = new Set(taskSelection);
+    mutateData((draft) => ({
+      ...draft,
+      tasks: draft.tasks.map((task) => (ids.has(task.id) ? { ...task, listId, updatedAt: nowIso() } : task)),
+    }));
+    setTaskSelection(new Set());
+    setTaskSelectMode(false);
+  };
+  const moveSelectedTasksToNewList = () => {
+    if (taskSelection.size === 0) return;
+    const list = createTaskList(`リスト${lists.length + 1}`);
+    const ids = new Set(taskSelection);
+    mutateData((draft) => ({
+      ...draft,
+      lists: [...draft.lists, list],
+      tasks: draft.tasks.map((task) => (ids.has(task.id) ? { ...task, listId: list.id, updatedAt: nowIso() } : task)),
+    }));
+    setUi((current) => ({ ...current, currentListId: list.id, todayOnly: false }));
+    setTaskSelection(new Set());
+    setTaskSelectMode(false);
+  };
   const toggleSubtask = (taskId, subtaskId) => {
     const task = tasks.find((item) => item.id === taskId);
     const subtask = task?.subtasks.find((item) => item.id === subtaskId);
@@ -701,7 +806,7 @@ function App() {
       ),
     }));
   };
-  const saveMemo = (memoId, body) => {
+  const saveMemo = (memoId, body, nextTab = 'memos') => {
     if (memoId === 'new') {
       if (body.trim()) mutateData((draft) => ({ ...draft, memos: [createMemo(body), ...draft.memos] }));
     } else {
@@ -710,7 +815,8 @@ function App() {
         memos: draft.memos.map((memo) => (memo.id === memoId ? { ...memo, body, updatedAt: nowIso() } : memo)),
       }));
     }
-    setRoute({ name: 'memos' });
+    setUi((current) => ({ ...current, activeTab: nextTab }));
+    setRoute({ name: nextTab });
   };
   const deleteSelectedMemos = () => {
     const ids = memoSelection;
@@ -783,7 +889,7 @@ function App() {
     ) : null;
 
   return (
-    <div className={`appShell ${blasting || memoBlasting ? 'blasting' : ''}`}>
+    <div className={`appShell ${blasting || memoBlasting ? 'blasting' : ''} ${route.name === 'memoEdit' ? 'memoEditing' : ''}`}>
       <header className="topBar">
         <div className="historyButtons">
           <button className="iconButton" onClick={() => dispatch({ type: 'UNDO' })} disabled={history.past.length === 0 || blasting || memoBlasting} aria-label="戻る">
@@ -795,7 +901,7 @@ function App() {
         </div>
         <div className="brand">
           <ListChecks size={21} />
-          <span>Tasktori</span>
+          <span>{ui.activeTab === 'tasks' ? currentList?.title || 'メイン' : 'Tasktori'}</span>
         </div>
         <div className="headerAction">{headerAction}</div>
       </header>
@@ -803,24 +909,18 @@ function App() {
       {(blasting || memoBlasting) && <BlastScene />}
 
       {ui.activeTab === 'tasks' && (
-        route.name === 'taskDetail' && selectedTask ? (
-          <DetailView
-            task={selectedTask}
-            lists={lists}
-            onBack={() => setRoute({ name: 'tasks' })}
-            onUpdate={(updater) => updateTask(selectedTask.id, updater)}
-            onDelete={() => deleteTask(selectedTask.id)}
-            onToggleSubtask={(subtaskId) => toggleSubtask(selectedTask.id, subtaskId)}
-          />
-        ) : (
+        <>
           <TaskScreen
             tasks={tasks}
             currentList={currentList}
             lists={lists}
             visibleTasks={visibleTasks}
             todayOnly={ui.todayOnly}
+            taskFilter={ui.taskFilter}
             sortBy={ui.sortBy}
             priorityMode={priorityMode}
+            selectMode={taskSelectMode}
+            selection={taskSelection}
             completingIds={completingIds}
             blasting={blasting}
             adding={adding}
@@ -835,8 +935,19 @@ function App() {
             onRenameTaskList={renameTaskList}
             onDeleteTaskList={deleteTaskList}
             onToggleTodayOnly={() => setUi((current) => ({ ...current, todayOnly: !current.todayOnly }))}
+            onSetFilter={(taskFilter) => setUi((current) => ({ ...current, taskFilter, todayOnly: false }))}
             onSetSort={setTaskSort}
             onTogglePriority={() => setPriorityMode(!priorityMode)}
+            onSelectMode={() => setTaskSelectMode(true)}
+            onCancelSelect={() => {
+              setTaskSelectMode(false);
+              setTaskSelection(new Set());
+            }}
+            onToggleSelect={toggleTaskSelection}
+            onSelectAll={selectAllVisibleTasks}
+            onDeleteSelected={deleteSelectedTasks}
+            onMoveSelected={moveSelectedTasks}
+            onMoveSelectedToNewList={moveSelectedTasksToNewList}
             onOpenTask={(taskId) => setRoute({ name: 'taskDetail', taskId })}
             onToggleDone={completeTask}
             onToggleExpanded={(task) => updateTask(task.id, { expanded: !task.expanded })}
@@ -847,12 +958,22 @@ function App() {
             onBulkText={setBulkText}
             onAddBulk={addBulk}
           />
-        )
+          {route.name === 'taskDetail' && selectedTask && (
+            <TaskDetailSheet
+              task={selectedTask}
+              onClose={() => setRoute({ name: 'tasks' })}
+              onUpdate={(updater) => updateTask(selectedTask.id, updater)}
+              onDelete={() => deleteTask(selectedTask.id)}
+              onDuplicate={() => duplicateTask(selectedTask.id)}
+              onToggleSubtask={(subtaskId) => toggleSubtask(selectedTask.id, subtaskId)}
+            />
+          )}
+        </>
       )}
 
       {ui.activeTab === 'memos' && (
         route.name === 'memoEdit' ? (
-          <MemoEditor memo={route.memoId === 'new' ? null : selectedMemo} onSave={saveMemo} />
+          <MemoEditor memo={route.memoId === 'new' ? null : selectedMemo} onSave={saveMemo} onDraft={setMemoDraft} onUndo={() => dispatch({ type: 'UNDO' })} onRedo={() => dispatch({ type: 'REDO' })} canUndo={history.past.length > 0} canRedo={history.future.length > 0} />
         ) : (
           <MemoScreen
             memos={filteredMemos}
@@ -899,7 +1020,7 @@ function App() {
       )}
 
       <input ref={importRef} type="file" accept="application/json" hidden onChange={importData} />
-      <BottomTabs activeTab={ui.activeTab} onSwitch={switchTab} />
+      <BottomTabs activeTab={ui.activeTab} onSwitch={(tab) => switchTab(tab, route.name === 'memoEdit' ? memoDraft : null)} />
     </div>
   );
 }
@@ -968,8 +1089,11 @@ function TaskScreen(props) {
     lists,
     visibleTasks,
     todayOnly,
+    taskFilter,
     sortBy,
     priorityMode,
+    selectMode,
+    selection,
     completingIds,
     blasting,
     adding,
@@ -981,8 +1105,16 @@ function TaskScreen(props) {
     onRenameTaskList,
     onDeleteTaskList,
     onToggleTodayOnly,
+    onSetFilter,
     onSetSort,
     onTogglePriority,
+    onSelectMode,
+    onCancelSelect,
+    onToggleSelect,
+    onSelectAll,
+    onDeleteSelected,
+    onMoveSelected,
+    onMoveSelectedToNewList,
     onOpenTask,
     onToggleDone,
     onToggleExpanded,
@@ -994,6 +1126,8 @@ function TaskScreen(props) {
     onAddBulk,
   } = props;
   const [sortOpen, setSortOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [listMenuOpen, setListMenuOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [listTitleDraft, setListTitleDraft] = useState(currentList?.title || '');
@@ -1058,6 +1192,7 @@ function TaskScreen(props) {
                 </div>
               ) : (
                 <>
+                  <button onClick={onAddTaskList}>タスク一覧を追加</button>
                   <button onClick={() => setRenaming(true)}>名前変更</button>
                   <button className="dangerMenuItem" onClick={() => onDeleteTaskList(currentList.id)} disabled={!canDeleteList}>
                     削除
@@ -1070,15 +1205,30 @@ function TaskScreen(props) {
         <button className="plainIcon" onClick={() => onSwitchList(1)} aria-label="次の一覧" disabled={lists.length <= 1}>
           <ChevronRight size={20} />
         </button>
-        <button className="iconButton listAddButton" onClick={onAddTaskList} aria-label="タスク一覧を追加">
-          <Plus size={20} />
-        </button>
-      </div>
-
-      <div className="taskToolbar" onClick={(event) => event.stopPropagation()}>
         <button className={`textButton ${todayOnly ? 'active' : ''}`} onClick={onToggleTodayOnly}>
           今日
         </button>
+        <div className="sortControl">
+          <button className={`iconButton ${taskFilter !== 'all' && !todayOnly ? 'activeIcon' : ''}`} onClick={() => setFilterOpen(!filterOpen)} aria-label="フィルター編集">
+            <Search size={19} />
+          </button>
+          {filterOpen && (
+            <div className="sortMenu filterMenu">
+              {[
+                ['all', 'すべて'],
+                ['today', '今日まで'],
+                ['overdue', '期限切れ'],
+                ['deadline', '期限あり'],
+                ['none', '期限なし'],
+                ['done', '完了済み'],
+              ].map(([id, label]) => (
+                <button key={id} className={taskFilter === id && !todayOnly ? 'selected' : ''} onClick={() => { onSetFilter(id); setFilterOpen(false); }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="sortControl">
           <button className="iconButton" onClick={() => setSortOpen(!sortOpen)} aria-label="並び替え">
             <ArrowUpDown size={20} />
@@ -1097,7 +1247,32 @@ function TaskScreen(props) {
         <button className={`textButton ${priorityMode ? 'active' : ''}`} onClick={onTogglePriority}>
           優先度編集
         </button>
+        <button className={`textButton ${selectMode ? 'active' : ''}`} onClick={selectMode ? onCancelSelect : onSelectMode}>
+          {selectMode ? 'キャンセル' : '選択'}
+        </button>
       </div>
+
+      {selectMode && (
+        <div className="selectionToolbar" onClick={(event) => event.stopPropagation()}>
+          <button className="textButton" onClick={onSelectAll}>全て選択</button>
+          <button className="textButton dangerText" onClick={onDeleteSelected} disabled={selection.size === 0}>削除</button>
+          <div className="sortControl">
+            <button className="textButton" onClick={() => setMoveOpen(!moveOpen)} disabled={selection.size === 0}>移動</button>
+            {moveOpen && (
+              <div className="sortMenu moveMenu">
+                {lists.map((list) => (
+                  <button key={list.id} onClick={() => { onMoveSelected(list.id); setMoveOpen(false); }}>
+                    {list.title}
+                  </button>
+                ))}
+                <button className="selected" onClick={() => { onMoveSelectedToNewList(); setMoveOpen(false); }}>
+                  新しい一覧
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="taskList">
         {visibleTasks.length === 0 ? (
@@ -1113,7 +1288,10 @@ function TaskScreen(props) {
               completing={completingIds.has(task.id)}
               blasting={blasting}
               priorityMode={priorityMode}
+              selectMode={selectMode}
+              selected={selection.has(task.id)}
               onOpen={() => onOpenTask(task.id)}
+              onToggleSelect={() => onToggleSelect(task.id)}
               onToggleDone={() => onToggleDone(task)}
               onToggleExpanded={(event) => {
                 event.stopPropagation();
@@ -1160,23 +1338,29 @@ function TaskScreen(props) {
   );
 }
 
-function TaskRow({ task, completing, blasting, priorityMode, onOpen, onToggleDone, onToggleExpanded, onToggleSubtask, onPriority }) {
+function TaskRow({ task, completing, blasting, priorityMode, selectMode, selected, onOpen, onToggleSelect, onToggleDone, onToggleExpanded, onToggleSubtask, onPriority }) {
   const hasInlineContent = Boolean(task.memo.trim()) || task.subtasks.length > 0;
   return (
     <article
-      className={`taskItem ${task.done ? 'done' : ''} ${completing ? 'completing' : ''} ${blasting ? 'blastAway' : ''}`}
+      className={`taskItem priority-${task.priority} ${task.done ? 'done' : ''} ${completing ? 'completing' : ''} ${blasting ? 'blastAway' : ''}`}
       onClick={(event) => {
         event.stopPropagation();
+        if (selectMode) {
+          onToggleSelect();
+          return;
+        }
         onOpen();
       }}
     >
       <div className="taskMain">
         <div className="expandSlot">
-          {hasInlineContent && (
+          {selectMode ? (
+            <input className="rowSelectCheck" type="checkbox" checked={selected} onChange={onToggleSelect} onClick={(event) => event.stopPropagation()} />
+          ) : hasInlineContent ? (
             <button className="plainIcon" onClick={onToggleExpanded} aria-label={task.expanded ? '閉じる' : '開く'}>
               {task.expanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
             </button>
-          )}
+          ) : null}
         </div>
         <label className="checkWrap" onClick={(event) => event.stopPropagation()}>
           <input type="checkbox" checked={task.done || completing} onChange={onToggleDone} />
@@ -1188,7 +1372,7 @@ function TaskRow({ task, completing, blasting, priorityMode, onOpen, onToggleDon
         </div>
         {priorityMode && (
           <div className="priorityBar" aria-label="優先度">
-            {[0, 1, 2, 3].map((priority) => (
+            {PRIORITIES.map((priority) => (
               <button key={priority} className={priority <= task.priority ? 'filled' : ''} onClick={(event) => onPriority(event, priority)} aria-label={`優先度${priority}`} />
             ))}
           </div>
@@ -1213,88 +1397,207 @@ function TaskRow({ task, completing, blasting, priorityMode, onOpen, onToggleDon
   );
 }
 
-function DetailView({ task, lists, onBack, onUpdate, onDelete, onToggleSubtask }) {
+function TaskDetailSheet({ task, onClose, onUpdate, onDelete, onDuplicate, onToggleSubtask }) {
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(task.title);
   const [newSubtask, setNewSubtask] = useState('');
+  const [addingSubtask, setAddingSubtask] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [toolMenu, setToolMenu] = useState(null);
+  const [touchStart, setTouchStart] = useState(null);
+  const dateInputRef = useRef(null);
+
+  useEffect(() => {
+    setTitleDraft(task.title);
+  }, [task.id, task.title]);
+
+  const saveTitle = () => {
+    const parsed = parseDeadline(titleDraft);
+    const nextTitle = parsed.title.trim() || titleDraft.trim() || task.title;
+    onUpdate({ title: nextTitle, deadline: parsed.deadline ?? task.deadline });
+    setEditingTitle(false);
+  };
+
   const addSubtask = () => {
     const title = newSubtask.trim();
     if (!title) return;
     onUpdate((draft) => ({ ...draft, subtasks: [...draft.subtasks, createSubtask(title)] }));
     setNewSubtask('');
+    setAddingSubtask(false);
   };
+
   const updateSubtaskTitle = (subtaskId, title) => {
     onUpdate((draft) => ({
       ...draft,
       subtasks: draft.subtasks.map((subtask) => (subtask.id === subtaskId ? { ...subtask, title, updatedAt: nowIso() } : subtask)),
     }));
   };
+
   const deleteSubtask = (subtaskId) => {
     onUpdate((draft) => ({ ...draft, subtasks: draft.subtasks.filter((subtask) => subtask.id !== subtaskId) }));
   };
 
+  const setDeadlineEndOfDay = (offset) => {
+    const date = endOfDay(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + offset));
+    onUpdate({ deadline: date.toISOString() });
+    setToolMenu(null);
+  };
+
+  const sectionLabel = taskDisplaySection(task) === 'someday' ? 'いつか' : '今日';
+  const priorityLabel = task.priority > 1 ? `優先度${task.priority - 1}` : '';
+
   return (
-    <main className="detailView">
-      <div className="detailHeader">
-        <button className="iconButton" onClick={onBack} aria-label="一覧へ戻る">
-          <ArrowLeft size={22} />
-        </button>
-        <h1>詳細</h1>
-        <button className="iconButton danger" onClick={onDelete} aria-label="削除">
-          <Trash2 size={21} />
-        </button>
-      </div>
-      <label className="fieldLabel">
-        タスク名
-        <input value={task.title} onChange={(event) => onUpdate({ title: event.target.value })} />
-      </label>
-      <label className="fieldLabel">
-        優先度
-        <div className="priorityPicker">
-          {[0, 1, 2, 3].map((priority) => (
-            <button key={priority} className={task.priority === priority ? 'selected' : ''} onClick={() => onUpdate({ priority })}>
-              {priority}
+    <div
+      className="sheetBackdrop"
+      onClick={onClose}
+      onTouchStart={(event) => setTouchStart({ x: event.touches[0].clientX, y: event.touches[0].clientY })}
+      onTouchEnd={(event) => {
+        const touch = event.changedTouches[0];
+        if (touchStart && touch.clientY - touchStart.y > 80 && Math.abs(touch.clientX - touchStart.x) < 90) onClose();
+        setTouchStart(null);
+      }}
+    >
+      <section className="taskSheet" onClick={(event) => event.stopPropagation()}>
+        <div className="sheetHandle" />
+        <div className="sheetTop">
+          <button className="sheetIconButton" onClick={onClose} aria-label="閉じる">
+            <X size={22} />
+          </button>
+          <div className="sheetMenuWrap">
+            <button className="sheetIconButton" onClick={() => setMenuOpen(!menuOpen)} aria-label="メニュー">
+              <Ellipsis size={23} />
             </button>
-          ))}
+            {menuOpen && (
+              <div className="sheetPopup sheetMenu">
+                <button onClick={() => { onDuplicate(); setMenuOpen(false); }}>複製</button>
+                <button className="dangerMenuItem" onClick={() => { onDelete(); setMenuOpen(false); }}>削除</button>
+              </div>
+            )}
+          </div>
         </div>
-      </label>
-      <label className="fieldLabel">
-        締切日時
-        <input type="datetime-local" value={toLocalInputValue(task.deadline)} onChange={(event) => onUpdate({ deadline: event.target.value ? new Date(event.target.value).toISOString() : null })} />
-      </label>
-      <label className="fieldLabel">
-        所属
-        <select value={task.listId || DEFAULT_LIST_ID} onChange={(event) => onUpdate({ listId: event.target.value })}>
-          {lists.map((list) => (
-            <option key={list.id} value={list.id}>
-              {list.title}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="fieldLabel">
-        メモ
-        <textarea className="memoInput" value={task.memo} onChange={(event) => onUpdate({ memo: event.target.value })} placeholder="メモ" />
-      </label>
-      <section className="detailSection">
-        <h2>チェックリスト</h2>
-        <div className="detailSubtasks">
+
+        <div className="sheetTitleRow">
+          <label className="checkWrap sheetCheck" onClick={(event) => event.stopPropagation()}>
+            <input type="checkbox" checked={task.done} onChange={() => onUpdate({ done: !task.done })} />
+            <span />
+          </label>
+          {editingTitle ? (
+            <input
+              className="sheetTitleInput"
+              value={titleDraft}
+              onChange={(event) => setTitleDraft(event.target.value)}
+              onBlur={saveTitle}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  saveTitle();
+                }
+              }}
+              autoFocus
+            />
+          ) : (
+            <button className="sheetTitleButton" onClick={() => setEditingTitle(true)}>
+              {task.title}
+            </button>
+          )}
+        </div>
+
+        <div className="sheetChips">
+          {task.deadline && <span className="infoChip"><CalendarDays size={15} />{formatDeadline(task.deadline)}</span>}
+          <span className="infoChip"><Cloud size={15} />{sectionLabel}</span>
+          {priorityLabel && <span className="infoChip"><Flag size={15} />{priorityLabel}</span>}
+        </div>
+
+        <textarea
+          className="sheetMemo"
+          value={task.memo}
+          onChange={(event) => onUpdate({ memo: event.target.value })}
+          placeholder="メモを書く..."
+        />
+
+        <div className="sheetSubtasks">
           {task.subtasks.map((subtask) => (
-            <div key={subtask.id} className="detailSubtaskRow">
+            <div key={subtask.id} className="sheetSubtaskRow">
               <input type="checkbox" checked={subtask.done} onChange={() => onToggleSubtask(subtask.id)} />
               <input value={subtask.title} onChange={(event) => updateSubtaskTitle(subtask.id, event.target.value)} />
-              <button className="plainIcon danger" onClick={() => deleteSubtask(subtask.id)} aria-label="子タスク削除">
+              <button className="plainIcon danger" onClick={() => deleteSubtask(subtask.id)} aria-label="サブタスク削除">
                 <Trash2 size={18} />
               </button>
             </div>
           ))}
+          {addingSubtask ? (
+            <div className="sheetAddSubtask">
+              <input
+                value={newSubtask}
+                onChange={(event) => setNewSubtask(event.target.value)}
+                onBlur={addSubtask}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') addSubtask();
+                }}
+                placeholder="サブタスク"
+                autoFocus
+              />
+            </div>
+          ) : task.subtasks.length === 0 ? (
+            <button className="sheetAddText" onClick={() => setAddingSubtask(true)}>＋ サブタスクを追加</button>
+          ) : null}
         </div>
-        <div className="newSubtaskRow">
-          <input value={newSubtask} onChange={(event) => setNewSubtask(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && addSubtask()} placeholder="チェック項目を追加" />
-          <button className="iconButton" onClick={addSubtask} aria-label="追加">
-            <Plus size={20} />
-          </button>
+
+        <div className="sheetToolbar">
+          <div className="sheetToolWrap">
+            <button onClick={() => setToolMenu(toolMenu === 'deadline' ? null : 'deadline')}><CalendarDays size={20} /><span>締切</span></button>
+            {toolMenu === 'deadline' && (
+              <div className="sheetPopup toolPopup">
+                <button onClick={() => setDeadlineEndOfDay(0)}>今日中</button>
+                <button onClick={() => setDeadlineEndOfDay(1)}>明日中</button>
+                <button onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()}>日付を選択</button>
+                <button onClick={() => { onUpdate({ deadline: null }); setToolMenu(null); }}>締切なし</button>
+              </div>
+            )}
+          </div>
+          <div className="sheetToolWrap">
+            <button className={task.deadline ? 'disabledTool' : ''} disabled={Boolean(task.deadline)} onClick={() => setToolMenu(toolMenu === 'section' ? null : 'section')}><Cloud size={20} /><span>所属</span></button>
+            {toolMenu === 'section' && (
+              <div className="sheetPopup toolPopup">
+                <button onClick={() => { onUpdate({ section: 'today' }); setToolMenu(null); }}>今日</button>
+                <button onClick={() => { onUpdate({ section: 'someday' }); setToolMenu(null); }}>いつか</button>
+              </div>
+            )}
+          </div>
+          <div className="sheetToolWrap">
+            <button onClick={() => setToolMenu(toolMenu === 'priority' ? null : 'priority')}><Flag size={20} /><span>優先度</span></button>
+            {toolMenu === 'priority' && (
+              <div className="sheetPopup toolPopup">
+                {[
+                  ['なし', 1],
+                  ['1', 2],
+                  ['2', 3],
+                  ['3', 4],
+                ].map(([label, value]) => (
+                  <button key={label} onClick={() => { onUpdate({ priority: value }); setToolMenu(null); }}>{label}</button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
+        <button className="sheetFloatingAdd" onClick={() => setAddingSubtask(true)} aria-label="サブタスクを追加">
+          <Plus size={28} />
+        </button>
+        <input
+          ref={dateInputRef}
+          className="hiddenDatePicker"
+          type="date"
+          onChange={(event) => {
+            if (!event.target.value) return;
+            const [year, month, day] = event.target.value.split('-').map(Number);
+            onUpdate({ deadline: endOfDay(new Date(year, month - 1, day)).toISOString() });
+            setToolMenu(null);
+            event.target.value = '';
+          }}
+        />
       </section>
-    </main>
+    </div>
   );
 }
 
@@ -1393,19 +1696,40 @@ function MemoScreen(props) {
   );
 }
 
-function MemoEditor({ memo, onSave }) {
+function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo }) {
   const [body, setBody] = useState(memo?.body || '');
   const memoId = memo?.id || 'new';
+  const touchStartRef = useRef(null);
+  useEffect(() => {
+    onDraft({ memoId, body });
+  }, [memoId, body, onDraft]);
+  const save = () => onSave(memoId, body);
   return (
-    <main className="detailView">
-      <div className="detailHeader">
-        <button className="iconButton" onClick={() => onSave(memoId, body)} aria-label="保存して戻る">
-          <ArrowLeft size={22} />
-        </button>
-        <h1>メモ編集</h1>
-        <span />
-      </div>
+    <main
+      className="memoEditorView"
+      onTouchStart={(event) => {
+        const touch = event.touches[0];
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      }}
+      onTouchEnd={(event) => {
+        const start = touchStartRef.current;
+        const touch = event.changedTouches[0];
+        touchStartRef.current = null;
+        if (start && touch.clientX - start.x > 82 && Math.abs(touch.clientY - start.y) < 70) save();
+      }}
+    >
+      <button className="editorBackButton" onClick={save} aria-label="保存して戻る">
+        <ArrowLeft size={24} />
+      </button>
       <textarea className="memoEditorInput" value={body} onChange={(event) => setBody(event.target.value)} placeholder="メモを書く" autoFocus />
+      <div className="editorFloatingHistory">
+        <button className="iconButton" onClick={onUndo} disabled={!canUndo} aria-label="戻る">
+          <Undo2 size={20} />
+        </button>
+        <button className="iconButton" onClick={onRedo} disabled={!canRedo} aria-label="進む">
+          <Redo2 size={20} />
+        </button>
+      </div>
     </main>
   );
 }
@@ -1466,7 +1790,7 @@ createRoot(document.getElementById('root')).render(<App />);
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }).catch(() => {});
   });
 } else if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
