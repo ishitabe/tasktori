@@ -546,7 +546,7 @@ const taskMatchesFilter = (task, filter) => {
 
 const sortTasks = (tasks, sortBy) =>
   [...tasks].sort((a, b) => {
-    if (sortBy === 'created') return new Date(a.createdAt) - new Date(b.createdAt);
+    if (sortBy === 'created') return new Date(b.createdAt) - new Date(a.createdAt);
     const groupDiff = taskGroupRank(a) - taskGroupRank(b);
     if (groupDiff !== 0) return groupDiff;
     const priorityDiff = b.priority - a.priority;
@@ -834,10 +834,13 @@ function App() {
     if (memoId === 'new') {
       if (body.trim()) mutateData((draft) => ({ ...draft, memos: [createMemo(body), ...draft.memos] }));
     } else {
-      mutateData((draft) => ({
-        ...draft,
-        memos: draft.memos.map((memo) => (memo.id === memoId ? { ...memo, body, updatedAt: nowIso() } : memo)),
-      }));
+      const currentMemo = memos.find((memo) => memo.id === memoId);
+      if (currentMemo && currentMemo.body !== body) {
+        mutateData((draft) => ({
+          ...draft,
+          memos: draft.memos.map((memo) => (memo.id === memoId ? { ...memo, body, updatedAt: nowIso() } : memo)),
+        }));
+      }
     }
     setUi((current) => ({ ...current, activeTab: nextTab }));
     setRoute({ name: nextTab });
@@ -1439,6 +1442,7 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
   const [dragging, setDragging] = useState(false);
   const [sheetTransition, setSheetTransition] = useState(true);
   const dragStartRef = useRef(null);
+  const dragYRef = useRef(0);
   const dateInputRef = useRef(null);
 
   useEffect(() => {
@@ -1489,32 +1493,38 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
 
   const priorityLabel = `優先度${task.priority}`;
   const closeSheet = () => {
+    dragStartRef.current = null;
+    dragYRef.current = window.innerHeight;
     setSheetTransition(true);
     setDragY(window.innerHeight);
     setClosing(true);
     window.setTimeout(onClose, 180);
   };
   const beginSheetDrag = (event) => {
-    const interactive = event.target.closest('input, textarea, button, label, .sheetToolbar, .sheetPopup');
-    if (interactive && !event.target.closest('.sheetDragZone')) return;
-    dragStartRef.current = { x: event.clientX, y: event.clientY };
+    dragStartRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+    dragYRef.current = 0;
     setSheetTransition(false);
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
   const moveSheetDrag = (event) => {
     const start = dragStartRef.current;
     if (!start) return;
-    const dy = Math.max(0, event.clientY - start.y);
-    if (dy > 2) {
+    const dx = Math.abs(event.clientX - start.x);
+    const dy = event.clientY - start.y;
+    if (dy > 6 && dy > dx * 1.15) {
       event.preventDefault();
       setDragging(true);
+      dragYRef.current = dy;
       setDragY(dy);
     }
   };
   const endSheetDrag = () => {
     setSheetTransition(true);
-    if (dragY > 72) closeSheet();
-    else setDragY(0);
+    if (dragging && dragYRef.current > 48) closeSheet();
+    else {
+      dragYRef.current = 0;
+      setDragY(0);
+    }
     setDragging(false);
     dragStartRef.current = null;
   };

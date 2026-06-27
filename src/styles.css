@@ -983,10 +983,6 @@ button {
   animation: sheetFadeOut 180ms ease-out both;
 }
 
-.taskSheet.closing {
-  transform: translateY(105%) !important;
-}
-
 .sheetDragZone {
   display: grid;
   place-items: center;
