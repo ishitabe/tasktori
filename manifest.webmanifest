@@ -2,11 +2,11 @@
   "name": "Tasktori",
   "short_name": "Tasktori",
   "description": "Mobile-first local task manager",
-  "start_url": "/tasktori/",
-  "scope": "/tasktori/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f7f3ec",
-  "theme_color": "#1f6f68",
+  "background_color": "#eaf8ff",
+  "theme_color": "#eaf8ff",
   "icons": [
     {
       "src": "./icons/icon-192.svg",
