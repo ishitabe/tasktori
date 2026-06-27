@@ -1,6 +1,6 @@
 :root {
-  color: #17211f;
-  background: #f7f3ec;
+  color: #102a38;
+  background: #eaf8ff;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -14,7 +14,9 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f7f3ec;
+  background: #eaf8ff;
+  overscroll-behavior: contain;
+  touch-action: manipulation;
 }
 
 button,
@@ -33,18 +35,26 @@ button {
   padding: env(safe-area-inset-top) 0 calc(94px + env(safe-area-inset-bottom));
 }
 
+.appShell.memoEditing {
+  padding-top: env(safe-area-inset-top);
+}
+
+.appShell.memoEditing .topBar {
+  display: none;
+}
+
 .topBar {
   position: sticky;
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: 100px 1fr 48px;
+  grid-template-columns: 96px 1fr 48px;
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: rgba(247, 243, 236, 0.94);
+  background: rgba(234, 248, 255, 0.94);
   backdrop-filter: blur(14px);
-  border-bottom: 1px solid rgba(23, 33, 31, 0.08);
+  border-bottom: 1px solid rgba(58, 160, 210, 0.16);
 }
 
 .historyButtons {
@@ -58,7 +68,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: #1f6f68;
+  color: #0b80b8;
   font-weight: 800;
 }
 
@@ -86,15 +96,15 @@ button {
   justify-content: center;
   border-radius: 8px;
   background: #ffffff;
-  color: #1f6f68;
-  box-shadow: 0 1px 0 rgba(23, 33, 31, 0.08);
+  color: #0b80b8;
+  box-shadow: 0 1px 0 rgba(58, 160, 210, 0.14);
 }
 
 .iconButton:disabled,
 .blastButton:disabled,
 .textButton:disabled {
   color: #a6aaa5;
-  background: #ebe7df;
+  background: #dceef7;
   cursor: default;
 }
 
@@ -105,12 +115,12 @@ button {
 
 .iconButton.quiet {
   box-shadow: none;
-  background: #efe9de;
+  background: #eaf8ff;
 }
 
 .blastButton {
-  background: #fff0d1;
-  color: #8a4c00;
+  background: #d7f1ff;
+  color: #0b80b8;
 }
 
 .listView,
@@ -124,16 +134,43 @@ button {
 
 .listView,
 .memoView {
-  min-height: calc(100vh - 150px);
+  min-height: calc(100dvh - 150px);
 }
 
 .listSwitcher {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 65px);
+  z-index: 18;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 40px 44px;
+  grid-template-columns: 30px minmax(72px, 1fr) 30px auto auto auto auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   text-align: center;
-  margin: 6px 0 14px;
+  margin: -2px -4px 12px;
+  padding: 6px 4px;
+  background: rgba(234, 248, 255, 0.96);
+  backdrop-filter: blur(12px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.listSwitcher::-webkit-scrollbar {
+  display: none;
+}
+
+.listSwitcher .textButton,
+.listSwitcher .iconButton {
+  min-height: 36px;
+}
+
+.listSwitcher .textButton {
+  padding: 0 10px;
+  font-size: 0.82rem;
+}
+
+.listSwitcher .iconButton {
+  width: 38px;
+  height: 38px;
 }
 
 .listSwitcher h1 {
@@ -159,8 +196,8 @@ button {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #17211f;
-  font-size: 1.42rem;
+  color: #102a38;
+  font-size: 1rem;
   font-weight: 800;
   line-height: 1.1;
 }
@@ -174,10 +211,10 @@ button {
   display: grid;
   gap: 6px;
   padding: 8px;
-  border: 1px solid rgba(23, 33, 31, 0.08);
+  border: 1px solid rgba(58, 160, 210, 0.16);
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 12px 26px rgba(39, 49, 45, 0.14);
+  box-shadow: 0 12px 26px rgba(49, 128, 168, 0.16);
   transform: translateX(-50%);
 }
 
@@ -185,14 +222,14 @@ button {
   min-height: 42px;
   border: 0;
   border-radius: 7px;
-  background: #e4eee9;
-  color: #1f6f68;
+  background: #e1f4ff;
+  color: #0b80b8;
   font-weight: 800;
 }
 
 .listMenu button:disabled {
   color: #a6aaa5;
-  background: #ebe7df;
+  background: #dceef7;
 }
 
 .listMenu .dangerMenuItem {
@@ -210,13 +247,13 @@ button {
   min-width: 0;
   min-height: 42px;
   padding: 0 10px;
-  border: 1px solid #d8d0c4;
+  border: 1px solid #a8d8ef;
   border-radius: 7px;
 }
 
 .eyebrow {
   margin: 0 0 2px;
-  color: #66736f;
+  color: #587181;
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -230,37 +267,39 @@ button {
   padding: 0;
   border-radius: 8px;
   background: transparent;
-  color: #66736f;
+  color: #5c7d90;
 }
 
 .plainIcon:disabled {
   color: #b9afa0;
 }
 
-.taskToolbar {
+.selectionToolbar {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 118px);
+  z-index: 17;
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 4px 0 16px;
-}
-
-.taskToolbar .textButton:last-child {
-  margin-left: auto;
+  gap: 8px;
+  margin: -2px 0 10px;
+  padding: 6px 0;
+  background: rgba(234, 248, 255, 0.96);
+  backdrop-filter: blur(12px);
 }
 
 .textButton {
   min-height: 42px;
   padding: 0 13px;
   border-radius: 8px;
-  color: #1f6f68;
-  background: #e4eee9;
+  color: #0b80b8;
+  background: #dff3ff;
   font-weight: 800;
   white-space: nowrap;
 }
 
 .textButton.active {
-  color: #17211f;
-  background: #f3c969;
+  color: #07344d;
+  background: #aee4ff;
 }
 
 .textButton.dangerText {
@@ -281,10 +320,10 @@ button {
   gap: 5px;
   width: 128px;
   padding: 6px;
-  border: 1px solid rgba(23, 33, 31, 0.08);
+  border: 1px solid rgba(58, 160, 210, 0.16);
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 12px 26px rgba(39, 49, 45, 0.12);
+  box-shadow: 0 12px 26px rgba(49, 128, 168, 0.16);
 }
 
 .sortMenu button {
@@ -292,13 +331,13 @@ button {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #17211f;
+  color: #102a38;
   font-weight: 800;
   text-align: left;
 }
 
 .sortMenu button.selected {
-  background: #f3c969;
+  background: #bfeaff;
 }
 
 .taskList,
@@ -310,11 +349,27 @@ button {
 .taskItem,
 .memoItem {
   position: relative;
-  border: 1px solid rgba(23, 33, 31, 0.08);
+  border: 1px solid rgba(58, 160, 210, 0.15);
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 8px 24px rgba(39, 49, 45, 0.06);
+  box-shadow: 0 8px 24px rgba(49, 128, 168, 0.08);
   overflow: hidden;
+}
+
+.taskItem.priority-1 {
+  background: #f4f7f8;
+  border-color: #d8e3e8;
+}
+
+.taskItem.priority-3 {
+  background: #edf9ff;
+  border-color: #8dd7fb;
+}
+
+.taskItem.priority-4 {
+  background: #dff4ff;
+  border-color: #38aee8;
+  box-shadow: 0 9px 26px rgba(37, 148, 205, 0.16);
 }
 
 .taskItem.completing {
@@ -326,14 +381,14 @@ button {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(31, 111, 104, 0), rgba(243, 201, 105, 0.22), rgba(31, 111, 104, 0));
+  background: linear-gradient(90deg, rgba(11, 128, 184, 0), rgba(151, 222, 255, 0.32), rgba(11, 128, 184, 0));
   transform: translateX(-120%);
   animation: taskShine 420ms ease-out forwards;
 }
 
 .taskItem.completing .checkWrap span {
-  border-color: #1f6f68;
-  background: #1f6f68;
+  border-color: #0b80b8;
+  background: #0b80b8;
   box-shadow: inset 0 0 0 5px #ffffff;
   animation: checkPop 260ms cubic-bezier(0.18, 1.35, 0.35, 1) both;
 }
@@ -386,14 +441,14 @@ button {
 .checkWrap span {
   width: 24px;
   height: 24px;
-  border: 2px solid #8aa19b;
+  border: 2px solid #87bed8;
   border-radius: 7px;
   background: #ffffff;
 }
 
 .checkWrap input:checked + span {
-  border-color: #1f6f68;
-  background: #1f6f68;
+  border-color: #0b80b8;
+  background: #0b80b8;
   box-shadow: inset 0 0 0 5px #ffffff;
 }
 
@@ -409,14 +464,14 @@ button {
 }
 
 .taskText time {
-  color: #b33b32;
+  color: #0875ad;
   font-size: 0.82rem;
   font-weight: 800;
 }
 
 .taskItem.done .taskText strong,
 .subtaskCheck.done span {
-  color: #8c9692;
+  color: #7c909b;
   text-decoration: line-through;
 }
 
@@ -430,18 +485,18 @@ button {
 .priorityBar button {
   width: 18px;
   height: 28px;
-  border: 1px solid #d7d0c4;
+  border: 1px solid #a8d8ef;
   border-radius: 5px;
-  background: #f3efe7;
+  background: #eff9fe;
 }
 
 .priorityBar button.filled {
-  background: #f3c969;
-  border-color: #c99b24;
+  background: #35aee8;
+  border-color: #0b80b8;
 }
 
 .expandedPanel {
-  border-top: 1px solid #f0ece5;
+  border-top: 1px solid #d8edf7;
   padding: 10px 16px 14px 82px;
   display: grid;
   gap: 10px;
@@ -450,7 +505,7 @@ button {
 .memoPreview {
   margin: 0;
   white-space: pre-wrap;
-  color: #47504d;
+  color: #38586a;
   line-height: 1.5;
 }
 
@@ -465,7 +520,7 @@ button {
   align-items: center;
   gap: 10px;
   position: relative;
-  color: #24312e;
+  color: #102a38;
 }
 
 .subtaskCheck::before {
@@ -473,13 +528,13 @@ button {
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
-  border: 2px solid #8aa19b;
+  border: 2px solid #87bed8;
   border-radius: 6px;
 }
 
 .subtaskCheck:has(input:checked)::before {
-  border-color: #1f6f68;
-  background: #1f6f68;
+  border-color: #0b80b8;
+  background: #0b80b8;
   box-shadow: inset 0 0 0 4px #ffffff;
 }
 
@@ -489,7 +544,7 @@ button {
   place-items: center;
   align-content: center;
   gap: 10px;
-  color: #66736f;
+  color: #5c7d90;
 }
 
 .emptyState p {
@@ -504,7 +559,7 @@ button {
   bottom: calc(68px + env(safe-area-inset-bottom));
   z-index: 30;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   padding: 10px 16px;
   pointer-events: none;
 }
@@ -517,10 +572,10 @@ button {
   left: 50%;
   transform: translateX(-50%);
   padding: 12px 14px;
-  background: rgba(247, 243, 236, 0.96);
-  border-top: 1px solid rgba(23, 33, 31, 0.08);
+  background: rgba(234, 248, 255, 0.98);
+  border-top: 1px solid rgba(58, 160, 210, 0.16);
   pointer-events: auto;
-  max-height: calc(100vh - 150px);
+  max-height: min(48dvh, 380px);
   overflow: auto;
 }
 
@@ -530,12 +585,12 @@ button {
   max-height: 38vh;
   resize: vertical;
   padding: 12px;
-  border: 1px solid #d8d0c4;
+  border: 1px solid #8dd7fb;
   border-radius: 8px;
   background: #ffffff;
-  color: #17211f;
+  color: #102a38;
   line-height: 1.5;
-  box-shadow: 0 8px 28px rgba(39, 49, 45, 0.1);
+  box-shadow: 0 8px 28px rgba(49, 128, 168, 0.14);
 }
 
 .smartInput {
@@ -546,10 +601,10 @@ button {
 .smartTextareaWrap {
   position: relative;
   min-height: 148px;
-  border: 1px solid #d8d0c4;
+  border: 1px solid #8dd7fb;
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 8px 28px rgba(39, 49, 45, 0.1);
+  box-shadow: 0 8px 28px rgba(49, 128, 168, 0.14);
   overflow: hidden;
 }
 
@@ -571,7 +626,7 @@ button {
   resize: vertical;
   background: transparent;
   color: transparent;
-  caret-color: #17211f;
+  caret-color: #0b80b8;
   box-shadow: none;
   outline: 0;
 }
@@ -584,15 +639,15 @@ button {
   position: absolute;
   inset: 0;
   z-index: 1;
-  color: #17211f;
+  color: #102a38;
   pointer-events: none;
 }
 
 .deadlineHighlight {
   padding: 1px 3px;
   border-radius: 5px;
-  background: #dceefe;
-  color: #0b4f83;
+  background: #c9ecff;
+  color: #075f8c;
 }
 
 .recognitionPanel,
@@ -642,8 +697,8 @@ button {
   padding: 0 6px;
   border: 0;
   border-radius: 7px;
-  background: #e4eee9;
-  color: #1f6f68;
+  background: #dff3ff;
+  color: #0b80b8;
   font-size: 0.76rem;
   font-weight: 800;
 }
@@ -690,9 +745,9 @@ button {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #1f6f68;
+  background: #0b80b8;
   color: #ffffff;
-  box-shadow: 0 12px 26px rgba(31, 111, 104, 0.3);
+  box-shadow: 0 12px 26px rgba(11, 128, 184, 0.28);
   pointer-events: auto;
 }
 
@@ -711,7 +766,7 @@ button {
   gap: 8px;
   padding: 0 18px;
   border-radius: 8px;
-  background: #1f6f68;
+  background: #0b80b8;
   color: #ffffff;
   font-weight: 800;
 }
@@ -734,7 +789,7 @@ button {
   display: grid;
   gap: 7px;
   margin-bottom: 14px;
-  color: #47504d;
+  color: #38586a;
   font-size: 0.86rem;
   font-weight: 800;
 }
@@ -748,19 +803,19 @@ button {
   width: 100%;
   min-height: 46px;
   padding: 10px 12px;
-  border: 1px solid #d8d0c4;
+  border: 1px solid #a8d8ef;
   border-radius: 8px;
   background: #ffffff;
-  color: #17211f;
+  color: #102a38;
 }
 
 .fieldLabel select:disabled {
-  color: #8c9692;
-  background: #eee9df;
+  color: #7c909b;
+  background: #e4f4fb;
 }
 
 .fieldHint {
-  color: #8c6d33;
+  color: #0875ad;
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -779,16 +834,16 @@ button {
 
 .priorityPicker button {
   min-height: 44px;
-  border: 1px solid #d8d0c4;
+  border: 1px solid #a8d8ef;
   border-radius: 8px;
   background: #ffffff;
-  color: #17211f;
+  color: #102a38;
   font-weight: 800;
 }
 
 .priorityPicker button.selected {
-  background: #f3c969;
-  border-color: #c99b24;
+  background: #bfeaff;
+  border-color: #35aee8;
 }
 
 .detailSection {
@@ -815,7 +870,7 @@ button {
 .detailSubtaskRow input[type="checkbox"] {
   width: 22px;
   height: 22px;
-  accent-color: #1f6f68;
+  accent-color: #0b80b8;
 }
 
 .newSubtaskRow {
@@ -825,12 +880,304 @@ button {
   margin-top: 10px;
 }
 
+.sheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 10px max(10px, env(safe-area-inset-bottom));
+  background: rgba(8, 31, 45, 0.28);
+  animation: sheetFade 160ms ease-out both;
+}
+
+.taskSheet {
+  position: relative;
+  width: min(100%, 680px);
+  max-height: min(82dvh, 760px);
+  display: grid;
+  grid-template-rows: auto auto auto minmax(84px, auto) minmax(80px, 1fr) auto;
+  gap: 12px;
+  padding: 8px 14px 78px;
+  border: 1px solid rgba(139, 211, 246, 0.7);
+  border-radius: 22px 22px 18px 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 -18px 46px rgba(32, 102, 138, 0.22);
+  overflow: auto;
+  animation: sheetSlide 220ms cubic-bezier(0.2, 0.9, 0.22, 1) both;
+}
+
+.sheetHandle {
+  width: 42px;
+  height: 5px;
+  justify-self: center;
+  border-radius: 999px;
+  background: #c1ddea;
+}
+
+.sheetTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sheetIconButton,
+.editorBackButton {
+  cursor: pointer;
+}
+
+.sheetIconButton {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: #eef9ff;
+  color: #0b80b8;
+}
+
+.sheetMenuWrap,
+.sheetToolWrap {
+  position: relative;
+}
+
+.sheetPopup {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 5px;
+  min-width: 132px;
+  padding: 7px;
+  border: 1px solid rgba(58, 160, 210, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(49, 128, 168, 0.18);
+}
+
+.sheetMenu {
+  top: calc(100% + 6px);
+  right: 0;
+}
+
+.sheetPopup button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #102a38;
+  font-weight: 800;
+  text-align: left;
+}
+
+.sheetPopup button:active {
+  background: #dff3ff;
+}
+
+.sheetTitleRow {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.sheetCheck {
+  margin-top: 7px;
+}
+
+.sheetTitleButton,
+.sheetTitleInput {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  background: transparent;
+  color: #102a38;
+  font-size: 1.55rem;
+  font-weight: 850;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.sheetTitleButton {
+  padding: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.sheetTitleInput {
+  padding: 4px 0;
+  border-bottom: 2px solid #8dd7fb;
+  outline: 0;
+}
+
+.sheetChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.infoChip {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #eef9ff;
+  color: #0b80b8;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.sheetMemo {
+  width: 100%;
+  min-height: 92px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #27485a;
+  line-height: 1.58;
+  resize: vertical;
+  outline: 0;
+}
+
+.sheetMemo::placeholder {
+  color: #80a5b7;
+}
+
+.sheetSubtasks {
+  min-height: 80px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.sheetSubtaskRow {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 9px;
+}
+
+.sheetSubtaskRow input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: #0b80b8;
+}
+
+.sheetSubtaskRow input:not([type]),
+.sheetAddSubtask input {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-bottom: 1px solid #d8edf7;
+  background: transparent;
+  color: #102a38;
+  outline: 0;
+}
+
+.sheetAddText {
+  width: fit-content;
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: #eef9ff;
+  color: #0b80b8;
+  font-weight: 850;
+}
+
+.sheetToolbar {
+  position: sticky;
+  bottom: 0;
+  justify-self: center;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: min(330px, calc(100% - 76px));
+  padding: 6px;
+  border: 1px solid rgba(58, 160, 210, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 28px rgba(49, 128, 168, 0.16);
+}
+
+.sheetToolbar button {
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #0b80b8;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.sheetToolbar .disabledTool {
+  color: #91a8b3;
+}
+
+.toolPopup {
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+}
+
+.sheetFloatingAdd {
+  position: sticky;
+  right: 0;
+  bottom: 2px;
+  justify-self: end;
+  width: 58px;
+  height: 58px;
+  margin-top: -68px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: #0b80b8;
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(11, 128, 184, 0.28);
+}
+
+@keyframes sheetFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheetSlide {
+  from {
+    transform: translateY(44px);
+    opacity: 0.7;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 .memoToolbar {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 65px);
+  z-index: 18;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   margin-bottom: 14px;
+  padding: 6px 0;
+  background: rgba(234, 248, 255, 0.96);
+  backdrop-filter: blur(12px);
 }
 
 .memoToolbar:has(.searchBox + .textButton:last-child) {
@@ -844,10 +1191,10 @@ button {
   align-items: center;
   gap: 8px;
   padding: 0 12px;
-  border: 1px solid #d8d0c4;
+  border: 1px solid #a8d8ef;
   border-radius: 8px;
   background: #ffffff;
-  color: #66736f;
+  color: #5c7d90;
 }
 
 .searchBox input {
@@ -870,7 +1217,7 @@ button {
 .memoItem input {
   width: 22px;
   height: 22px;
-  accent-color: #1f6f68;
+  accent-color: #0b80b8;
 }
 
 .memoItem strong,
@@ -886,20 +1233,57 @@ button {
 
 .memoItem p {
   margin: 5px 0 0;
-  color: #66736f;
+  color: #5c7d90;
   font-size: 0.88rem;
+}
+
+.memoEditorView {
+  width: min(100%, 680px);
+  min-height: calc(100dvh - 80px - env(safe-area-inset-bottom));
+  margin: 0 auto;
+  padding: 12px 14px calc(94px + env(safe-area-inset-bottom));
+}
+
+.editorBackButton {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 14px;
+  z-index: 30;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0b80b8;
+  box-shadow: 0 8px 22px rgba(49, 128, 168, 0.14);
 }
 
 .memoEditorInput {
   width: 100%;
-  min-height: calc(100vh - 190px);
-  padding: 14px;
-  border: 1px solid #d8d0c4;
+  min-height: calc(100dvh - 128px - env(safe-area-inset-bottom));
+  padding: 66px 14px 14px;
+  border: 1px solid #8dd7fb;
   border-radius: 8px;
   background: #ffffff;
-  color: #17211f;
+  color: #102a38;
   line-height: 1.6;
   resize: vertical;
+}
+
+.editorFloatingHistory {
+  position: fixed;
+  right: 14px;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  z-index: 36;
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(49, 128, 168, 0.14);
 }
 
 .settingsView h1 {
@@ -951,8 +1335,8 @@ button {
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(23, 33, 31, 0.08);
-  background: rgba(255, 252, 246, 0.96);
+  border-top: 1px solid rgba(58, 160, 210, 0.16);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(14px);
 }
 
@@ -965,14 +1349,29 @@ button {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #66736f;
+  color: #5c7d90;
   font-size: 0.76rem;
   font-weight: 800;
 }
 
 .bottomTabs button.active {
-  background: #e4eee9;
-  color: #1f6f68;
+  background: #dff3ff;
+  color: #0b80b8;
+}
+
+.activeIcon {
+  background: #bfeaff;
+}
+
+.filterMenu,
+.moveMenu {
+  width: 150px;
+}
+
+.rowSelectCheck {
+  width: 22px;
+  height: 22px;
+  accent-color: #0b80b8;
 }
 
 .blastScene {
@@ -999,8 +1398,8 @@ button {
   width: 25px;
   height: 18px;
   border-radius: 50% 55% 45% 50%;
-  background: #1f6f68;
-  box-shadow: 15px -3px 0 -7px #f3c969;
+  background: #0b80b8;
+  box-shadow: 15px -3px 0 -7px #7ed4ff;
 }
 
 .stormBird .body::after {
@@ -1008,7 +1407,7 @@ button {
   position: absolute;
   right: -10px;
   top: 5px;
-  border-left: 12px solid #f3c969;
+  border-left: 12px solid #7ed4ff;
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
 }
@@ -1018,7 +1417,7 @@ button {
   width: 35px;
   height: 20px;
   border-radius: 90% 10% 90% 10%;
-  background: #2e8f82;
+  background: #35aee8;
   transform-origin: right center;
 }
 
