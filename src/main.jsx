@@ -1438,7 +1438,7 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
   const [closing, setClosing] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [sheetTransition, setSheetTransition] = useState(true);
-  const touchStartRef = useRef(null);
+  const dragStartRef = useRef(null);
   const dateInputRef = useRef(null);
 
   useEffect(() => {
@@ -1495,15 +1495,16 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
     window.setTimeout(onClose, 180);
   };
   const beginSheetDrag = (event) => {
-    const touch = event.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    const interactive = event.target.closest('input, textarea, button, label, .sheetToolbar, .sheetPopup');
+    if (interactive && !event.target.closest('.sheetDragZone')) return;
+    dragStartRef.current = { x: event.clientX, y: event.clientY };
     setSheetTransition(false);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
   };
   const moveSheetDrag = (event) => {
-    const start = touchStartRef.current;
+    const start = dragStartRef.current;
     if (!start) return;
-    const touch = event.touches[0];
-    const dy = Math.max(0, touch.clientY - start.y);
+    const dy = Math.max(0, event.clientY - start.y);
     if (dy > 2) {
       event.preventDefault();
       setDragging(true);
@@ -1515,7 +1516,7 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
     if (dragY > 72) closeSheet();
     else setDragY(0);
     setDragging(false);
-    touchStartRef.current = null;
+    dragStartRef.current = null;
   };
   const currentListTitle = lists.find((list) => list.id === task.listId)?.title || 'メイン';
 
@@ -1532,11 +1533,15 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
         className={`taskSheet ${closing ? 'closing' : ''} ${dragging ? 'dragging' : ''}`}
         style={{ transform: `translateY(${dragY}px)`, transition: sheetTransition ? undefined : 'none' }}
         onClick={(event) => event.stopPropagation()}
+        onPointerDown={beginSheetDrag}
+        onPointerMove={moveSheetDrag}
+        onPointerUp={endSheetDrag}
+        onPointerCancel={endSheetDrag}
       >
-        <div className="sheetDragZone" onTouchStart={beginSheetDrag} onTouchMove={moveSheetDrag} onTouchEnd={endSheetDrag}>
+        <div className="sheetDragZone">
           <div className="sheetHandle" />
         </div>
-        <div className="sheetTop" onTouchStart={beginSheetDrag} onTouchMove={moveSheetDrag} onTouchEnd={endSheetDrag}>
+        <div className="sheetTop">
           <button className="sheetIconButton" onClick={closeSheet} aria-label="閉じる">
             <X size={22} />
           </button>
