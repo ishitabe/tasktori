@@ -142,7 +142,7 @@ button {
   top: calc(env(safe-area-inset-top) + 65px);
   z-index: 18;
   display: grid;
-  grid-template-columns: 30px minmax(72px, 1fr) 30px auto auto auto auto;
+  grid-template-columns: 30px 30px auto auto auto auto;
   align-items: center;
   gap: 6px;
   text-align: center;
@@ -152,6 +152,47 @@ button {
   backdrop-filter: blur(12px);
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+.compactControls {
+  justify-content: start;
+}
+
+.floatingChoiceBar {
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 116px);
+  z-index: 19;
+  display: flex;
+  gap: 6px;
+  max-width: 100%;
+  margin: -6px 0 10px;
+  padding: 6px 2px;
+  overflow-x: auto;
+  background: rgba(234, 248, 255, 0.98);
+  backdrop-filter: blur(12px);
+  scrollbar-width: none;
+}
+
+.floatingChoiceBar::-webkit-scrollbar {
+  display: none;
+}
+
+.floatingChoiceBar button {
+  min-height: 34px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 11px;
+  background: #ffffff;
+  color: #0b80b8;
+  font-size: 0.82rem;
+  font-weight: 850;
+  box-shadow: 0 4px 14px rgba(49, 128, 168, 0.1);
+}
+
+.floatingChoiceBar button.selected {
+  background: #bfeaff;
+  color: #07344d;
 }
 
 .listSwitcher::-webkit-scrollbar {
@@ -890,6 +931,8 @@ button {
   padding: 0 10px max(10px, env(safe-area-inset-bottom));
   background: rgba(8, 31, 45, 0.28);
   animation: sheetFade 160ms ease-out both;
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .taskSheet {
@@ -905,7 +948,17 @@ button {
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 -18px 46px rgba(32, 102, 138, 0.22);
   overflow: auto;
+  overscroll-behavior: contain;
   animation: sheetSlide 220ms cubic-bezier(0.2, 0.9, 0.22, 1) both;
+  transition: transform 180ms cubic-bezier(0.2, 0.9, 0.22, 1);
+}
+
+.sheetBackdrop.closing {
+  animation: sheetFadeOut 180ms ease-out both;
+}
+
+.taskSheet.closing {
+  transform: translateY(105%) !important;
 }
 
 .sheetHandle {
@@ -976,6 +1029,37 @@ button {
   background: #dff3ff;
 }
 
+.sheetPopup button.selected {
+  background: #bfeaff;
+}
+
+.sheetPopupLabel {
+  margin: 0;
+  padding: 3px 7px;
+  color: #6a8797;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.sheetDatePicker {
+  min-height: 38px;
+  display: grid;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 9px;
+  color: #102a38;
+  font-weight: 850;
+}
+
+.sheetDatePicker input {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid #a8d8ef;
+  border-radius: 7px;
+  padding: 6px;
+  background: #ffffff;
+}
+
 .sheetTitleRow {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
@@ -1018,15 +1102,15 @@ button {
 }
 
 .infoChip {
-  min-height: 30px;
+  min-height: 24px;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 0 10px;
-  border-radius: 999px;
+  padding: 0 7px;
+  border-radius: 7px;
   background: #eef9ff;
   color: #0b80b8;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 850;
 }
 
@@ -1128,30 +1212,21 @@ button {
   transform: translateX(-50%);
 }
 
-.sheetFloatingAdd {
-  position: sticky;
-  right: 0;
-  bottom: 2px;
-  justify-self: end;
-  width: 58px;
-  height: 58px;
-  margin-top: -68px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 50%;
-  background: #0b80b8;
-  color: #ffffff;
-  box-shadow: 0 12px 26px rgba(11, 128, 184, 0.28);
-}
-
 @keyframes sheetFade {
   from {
     opacity: 0;
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes sheetFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
@@ -1242,6 +1317,13 @@ button {
   min-height: calc(100dvh - 80px - env(safe-area-inset-bottom));
   margin: 0 auto;
   padding: 12px 14px calc(94px + env(safe-area-inset-bottom));
+  transition: transform 160ms cubic-bezier(0.2, 0.9, 0.22, 1);
+  will-change: transform;
+  touch-action: pan-y;
+}
+
+.memoEditorView.closing {
+  transform: translateX(110%) !important;
 }
 
 .editorBackButton {
@@ -1255,7 +1337,7 @@ button {
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 8px;
+  border-radius: 50%;
   background: #ffffff;
   color: #0b80b8;
   box-shadow: 0 8px 22px rgba(49, 128, 168, 0.14);
@@ -1276,12 +1358,12 @@ button {
 .editorFloatingHistory {
   position: fixed;
   right: 14px;
-  bottom: calc(82px + env(safe-area-inset-bottom));
+  bottom: calc(var(--keyboard-offset, 0px) + 12px + env(safe-area-inset-bottom));
   z-index: 36;
   display: flex;
   gap: 8px;
   padding: 6px;
-  border-radius: 8px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 8px 24px rgba(49, 128, 168, 0.14);
 }

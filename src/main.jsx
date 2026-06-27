@@ -961,6 +961,7 @@ function App() {
           {route.name === 'taskDetail' && selectedTask && (
             <TaskDetailSheet
               task={selectedTask}
+              lists={lists}
               onClose={() => setRoute({ name: 'tasks' })}
               onUpdate={(updater) => updateTask(selectedTask.id, updater)}
               onDelete={() => deleteTask(selectedTask.id)}
@@ -1175,33 +1176,10 @@ function TaskScreen(props) {
         onSwipeEnd(touch.clientX);
       }}
     >
-      <div className="listSwitcher" onClick={(event) => event.stopPropagation()}>
+      <div className="listSwitcher compactControls" onClick={(event) => event.stopPropagation()}>
         <button className="plainIcon" onClick={() => onSwitchList(-1)} aria-label="前の一覧" disabled={lists.length <= 1}>
           <ChevronLeft size={20} />
         </button>
-        <div className="listTitleWrap">
-          <button className="listTitleButton" onClick={() => setListMenuOpen(!listMenuOpen)}>
-            {currentList?.title || 'メイン'}
-          </button>
-          {listMenuOpen && (
-            <div className="listMenu">
-              {renaming ? (
-                <div className="renameBox">
-                  <input value={listTitleDraft} onChange={(event) => setListTitleDraft(event.target.value)} autoFocus />
-                  <button onClick={saveListName}>保存</button>
-                </div>
-              ) : (
-                <>
-                  <button onClick={onAddTaskList}>タスク一覧を追加</button>
-                  <button onClick={() => setRenaming(true)}>名前変更</button>
-                  <button className="dangerMenuItem" onClick={() => onDeleteTaskList(currentList.id)} disabled={!canDeleteList}>
-                    削除
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </div>
         <button className="plainIcon" onClick={() => onSwitchList(1)} aria-label="次の一覧" disabled={lists.length <= 1}>
           <ChevronRight size={20} />
         </button>
@@ -1212,37 +1190,11 @@ function TaskScreen(props) {
           <button className={`iconButton ${taskFilter !== 'all' && !todayOnly ? 'activeIcon' : ''}`} onClick={() => setFilterOpen(!filterOpen)} aria-label="フィルター編集">
             <Search size={19} />
           </button>
-          {filterOpen && (
-            <div className="sortMenu filterMenu">
-              {[
-                ['all', 'すべて'],
-                ['today', '今日まで'],
-                ['overdue', '期限切れ'],
-                ['deadline', '期限あり'],
-                ['none', '期限なし'],
-                ['done', '完了済み'],
-              ].map(([id, label]) => (
-                <button key={id} className={taskFilter === id && !todayOnly ? 'selected' : ''} onClick={() => { onSetFilter(id); setFilterOpen(false); }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         <div className="sortControl">
           <button className="iconButton" onClick={() => setSortOpen(!sortOpen)} aria-label="並び替え">
             <ArrowUpDown size={20} />
           </button>
-          {sortOpen && (
-            <div className="sortMenu">
-              <button className={sortBy === 'recommended' ? 'selected' : ''} onClick={() => { onSetSort('recommended'); setSortOpen(false); }}>
-                おすすめ順
-              </button>
-              <button className={sortBy === 'created' ? 'selected' : ''} onClick={() => { onSetSort('created'); setSortOpen(false); }}>
-                登録順
-              </button>
-            </div>
-          )}
         </div>
         <button className={`textButton ${priorityMode ? 'active' : ''}`} onClick={onTogglePriority}>
           優先度編集
@@ -1251,6 +1203,33 @@ function TaskScreen(props) {
           {selectMode ? 'キャンセル' : '選択'}
         </button>
       </div>
+
+      {(filterOpen || sortOpen) && (
+        <div className="floatingChoiceBar" onClick={(event) => event.stopPropagation()}>
+          {filterOpen && [
+            ['all', 'すべて'],
+            ['today', '今日まで'],
+            ['overdue', '期限切れ'],
+            ['deadline', '期限あり'],
+            ['none', '期限なし'],
+            ['done', '完了済み'],
+          ].map(([id, label]) => (
+            <button key={id} className={taskFilter === id && !todayOnly ? 'selected' : ''} onClick={() => { onSetFilter(id); setFilterOpen(false); }}>
+              {label}
+            </button>
+          ))}
+          {sortOpen && (
+            <>
+              <button className={sortBy === 'recommended' ? 'selected' : ''} onClick={() => { onSetSort('recommended'); setSortOpen(false); }}>
+                おすすめ順
+              </button>
+              <button className={sortBy === 'created' ? 'selected' : ''} onClick={() => { onSetSort('created'); setSortOpen(false); }}>
+                登録順
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {selectMode && (
         <div className="selectionToolbar" onClick={(event) => event.stopPropagation()}>
@@ -1397,14 +1376,16 @@ function TaskRow({ task, completing, blasting, priorityMode, selectMode, selecte
   );
 }
 
-function TaskDetailSheet({ task, onClose, onUpdate, onDelete, onDuplicate, onToggleSubtask }) {
+function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate, onToggleSubtask }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [newSubtask, setNewSubtask] = useState('');
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [toolMenu, setToolMenu] = useState(null);
-  const [touchStart, setTouchStart] = useState(null);
+  const [dragY, setDragY] = useState(0);
+  const [closing, setClosing] = useState(false);
+  const touchStartRef = useRef(null);
   const dateInputRef = useRef(null);
 
   useEffect(() => {
@@ -1443,24 +1424,46 @@ function TaskDetailSheet({ task, onClose, onUpdate, onDelete, onDuplicate, onTog
     setToolMenu(null);
   };
 
-  const sectionLabel = taskDisplaySection(task) === 'someday' ? 'いつか' : '今日';
-  const priorityLabel = task.priority > 1 ? `優先度${task.priority - 1}` : '';
+  const priorityLabel = `優先度${task.priority}`;
+  const closeSheet = () => {
+    setClosing(true);
+    window.setTimeout(onClose, 180);
+  };
+  const currentListTitle = lists.find((list) => list.id === task.listId)?.title || 'メイン';
 
   return (
     <div
-      className="sheetBackdrop"
-      onClick={onClose}
-      onTouchStart={(event) => setTouchStart({ x: event.touches[0].clientX, y: event.touches[0].clientY })}
-      onTouchEnd={(event) => {
-        const touch = event.changedTouches[0];
-        if (touchStart && touch.clientY - touchStart.y > 80 && Math.abs(touch.clientX - touchStart.x) < 90) onClose();
-        setTouchStart(null);
-      }}
+      className={`sheetBackdrop ${closing ? 'closing' : ''}`}
+      onClick={closeSheet}
+      onWheel={(event) => event.preventDefault()}
     >
-      <section className="taskSheet" onClick={(event) => event.stopPropagation()}>
+      <section
+        className={`taskSheet ${closing ? 'closing' : ''}`}
+        style={{ transform: `translateY(${dragY}px)` }}
+        onClick={(event) => event.stopPropagation()}
+        onTouchStart={(event) => {
+          const touch = event.touches[0];
+          touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+        }}
+        onTouchMove={(event) => {
+          const start = touchStartRef.current;
+          if (!start) return;
+          const touch = event.touches[0];
+          const dy = Math.max(0, touch.clientY - start.y);
+          if (dy > 4) {
+            event.preventDefault();
+            setDragY(dy);
+          }
+        }}
+        onTouchEnd={() => {
+          if (dragY > 96) closeSheet();
+          else setDragY(0);
+          touchStartRef.current = null;
+        }}
+      >
         <div className="sheetHandle" />
         <div className="sheetTop">
-          <button className="sheetIconButton" onClick={onClose} aria-label="閉じる">
+          <button className="sheetIconButton" onClick={closeSheet} aria-label="閉じる">
             <X size={22} />
           </button>
           <div className="sheetMenuWrap">
@@ -1504,8 +1507,7 @@ function TaskDetailSheet({ task, onClose, onUpdate, onDelete, onDuplicate, onTog
 
         <div className="sheetChips">
           {task.deadline && <span className="infoChip"><CalendarDays size={15} />{formatDeadline(task.deadline)}</span>}
-          <span className="infoChip"><Cloud size={15} />{sectionLabel}</span>
-          {priorityLabel && <span className="infoChip"><Flag size={15} />{priorityLabel}</span>}
+          <span className="infoChip"><Flag size={15} />{priorityLabel}</span>
         </div>
 
         <textarea
@@ -1550,17 +1552,34 @@ function TaskDetailSheet({ task, onClose, onUpdate, onDelete, onDuplicate, onTog
               <div className="sheetPopup toolPopup">
                 <button onClick={() => setDeadlineEndOfDay(0)}>今日中</button>
                 <button onClick={() => setDeadlineEndOfDay(1)}>明日中</button>
-                <button onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()}>日付を選択</button>
+                <label className="sheetDatePicker">
+                  日付を選択
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    onChange={(event) => {
+                      if (!event.target.value) return;
+                      const [year, month, day] = event.target.value.split('-').map(Number);
+                      onUpdate({ deadline: endOfDay(new Date(year, month - 1, day)).toISOString() });
+                      setToolMenu(null);
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
                 <button onClick={() => { onUpdate({ deadline: null }); setToolMenu(null); }}>締切なし</button>
               </div>
             )}
           </div>
           <div className="sheetToolWrap">
-            <button className={task.deadline ? 'disabledTool' : ''} disabled={Boolean(task.deadline)} onClick={() => setToolMenu(toolMenu === 'section' ? null : 'section')}><Cloud size={20} /><span>所属</span></button>
-            {toolMenu === 'section' && (
+            <button onClick={() => setToolMenu(toolMenu === 'list' ? null : 'list')}><Cloud size={20} /><span>一覧</span></button>
+            {toolMenu === 'list' && (
               <div className="sheetPopup toolPopup">
-                <button onClick={() => { onUpdate({ section: 'today' }); setToolMenu(null); }}>今日</button>
-                <button onClick={() => { onUpdate({ section: 'someday' }); setToolMenu(null); }}>いつか</button>
+                <p className="sheetPopupLabel">{currentListTitle}</p>
+                {lists.map((list) => (
+                  <button key={list.id} className={task.listId === list.id ? 'selected' : ''} onClick={() => { onUpdate({ listId: list.id }); setToolMenu(null); }}>
+                    {list.title}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -1569,10 +1588,10 @@ function TaskDetailSheet({ task, onClose, onUpdate, onDelete, onDuplicate, onTog
             {toolMenu === 'priority' && (
               <div className="sheetPopup toolPopup">
                 {[
-                  ['なし', 1],
-                  ['1', 2],
-                  ['2', 3],
-                  ['3', 4],
+                  ['1', 1],
+                  ['2', 2],
+                  ['3', 3],
+                  ['4', 4],
                 ].map(([label, value]) => (
                   <button key={label} onClick={() => { onUpdate({ priority: value }); setToolMenu(null); }}>{label}</button>
                 ))}
@@ -1581,21 +1600,6 @@ function TaskDetailSheet({ task, onClose, onUpdate, onDelete, onDuplicate, onTog
           </div>
         </div>
 
-        <button className="sheetFloatingAdd" onClick={() => setAddingSubtask(true)} aria-label="サブタスクを追加">
-          <Plus size={28} />
-        </button>
-        <input
-          ref={dateInputRef}
-          className="hiddenDatePicker"
-          type="date"
-          onChange={(event) => {
-            if (!event.target.value) return;
-            const [year, month, day] = event.target.value.split('-').map(Number);
-            onUpdate({ deadline: endOfDay(new Date(year, month - 1, day)).toISOString() });
-            setToolMenu(null);
-            event.target.value = '';
-          }}
-        />
       </section>
     </div>
   );
@@ -1698,24 +1702,57 @@ function MemoScreen(props) {
 
 function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo }) {
   const [body, setBody] = useState(memo?.body || '');
+  const [dragX, setDragX] = useState(0);
+  const [closing, setClosing] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const memoId = memo?.id || 'new';
   const touchStartRef = useRef(null);
   useEffect(() => {
     onDraft({ memoId, body });
   }, [memoId, body, onDraft]);
-  const save = () => onSave(memoId, body);
+  useEffect(() => {
+    const updateKeyboardOffset = () => {
+      const viewport = window.visualViewport;
+      if (!viewport) return setKeyboardOffset(0);
+      setKeyboardOffset(Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop));
+    };
+    updateKeyboardOffset();
+    window.visualViewport?.addEventListener('resize', updateKeyboardOffset);
+    window.visualViewport?.addEventListener('scroll', updateKeyboardOffset);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', updateKeyboardOffset);
+      window.visualViewport?.removeEventListener('scroll', updateKeyboardOffset);
+    };
+  }, []);
+  const save = () => {
+    setClosing(true);
+    window.setTimeout(() => onSave(memoId, body), 160);
+  };
   return (
     <main
-      className="memoEditorView"
+      className={`memoEditorView ${closing ? 'closing' : ''}`}
+      style={{ transform: `translateX(${dragX}px)`, '--keyboard-offset': `${keyboardOffset}px` }}
       onTouchStart={(event) => {
         const touch = event.touches[0];
         touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      }}
+      onTouchMove={(event) => {
+        const start = touchStartRef.current;
+        if (!start) return;
+        const touch = event.touches[0];
+        const dx = Math.max(0, touch.clientX - start.x);
+        const dy = Math.abs(touch.clientY - start.y);
+        if (dx > 4 && dy < 80) {
+          event.preventDefault();
+          setDragX(dx);
+        }
       }}
       onTouchEnd={(event) => {
         const start = touchStartRef.current;
         const touch = event.changedTouches[0];
         touchStartRef.current = null;
-        if (start && touch.clientX - start.x > 82 && Math.abs(touch.clientY - start.y) < 70) save();
+        if (start && touch.clientX - start.x > 110 && Math.abs(touch.clientY - start.y) < 80) save();
+        else setDragX(0);
       }}
     >
       <button className="editorBackButton" onClick={save} aria-label="保存して戻る">
