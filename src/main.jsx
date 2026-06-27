@@ -598,6 +598,9 @@ function App() {
   const [memoBlasting, setMemoBlasting] = useState(false);
   const [memoSearch, setMemoSearch] = useState('');
   const [memoDraft, setMemoDraft] = useState(null);
+  const [headerListMenuOpen, setHeaderListMenuOpen] = useState(false);
+  const [headerRenaming, setHeaderRenaming] = useState(false);
+  const [headerListTitleDraft, setHeaderListTitleDraft] = useState('');
   const [taskSelectMode, setTaskSelectMode] = useState(false);
   const [taskSelection, setTaskSelection] = useState(() => new Set());
   const [memoSelection, setMemoSelection] = useState(() => new Set());
@@ -609,6 +612,7 @@ function App() {
   const currentList = lists.find((list) => list.id === ui.currentListId) || lists[0];
   const selectedTask = tasks.find((task) => task.id === route.taskId);
   const selectedMemo = memos.find((memo) => memo.id === route.memoId);
+  const canDeleteCurrentList = currentList && currentList.id !== DEFAULT_LIST_ID && lists.length > 1;
   const visibleTasks = useMemo(() => {
     const active = tasks.filter((task) => {
       const inCurrentList = task.listId === currentList?.id;
@@ -637,6 +641,12 @@ function App() {
     if (route.name === 'taskDetail' && !selectedTask) setRoute({ name: 'tasks' });
     if (route.name === 'memoEdit' && route.memoId !== 'new' && !selectedMemo) setRoute({ name: 'memos' });
   }, [route, selectedTask, selectedMemo]);
+
+  useEffect(() => {
+    setHeaderListTitleDraft(currentList?.title || 'メイン');
+    setHeaderRenaming(false);
+    setHeaderListMenuOpen(false);
+  }, [currentList?.id, currentList?.title]);
 
   const mutateData = (updater) => dispatch({ type: 'APPLY', updater });
   const switchTab = (activeTab, memoDraft = null) => {
@@ -676,6 +686,12 @@ function App() {
       ...draft,
       lists: draft.lists.map((list) => (list.id === listId ? { ...list, title: nextTitle, updatedAt: nowIso() } : list)),
     }));
+  };
+  const saveCurrentListName = () => {
+    if (!currentList) return;
+    renameTaskList(currentList.id, headerListTitleDraft);
+    setHeaderRenaming(false);
+    setHeaderListMenuOpen(false);
   };
   const deleteTaskList = (listId) => {
     const target = lists.find((list) => list.id === listId);
@@ -806,6 +822,14 @@ function App() {
       ),
     }));
   };
+  const setVisibleTasksExpanded = (expanded) => {
+    const ids = new Set(visibleTasks.filter((task) => task.memo.trim() || task.subtasks.length > 0).map((task) => task.id));
+    if (ids.size === 0) return;
+    mutateData((draft) => ({
+      ...draft,
+      tasks: draft.tasks.map((task) => (ids.has(task.id) ? { ...task, expanded, updatedAt: nowIso() } : task)),
+    }));
+  };
   const saveMemo = (memoId, body, nextTab = 'memos') => {
     if (memoId === 'new') {
       if (body.trim()) mutateData((draft) => ({ ...draft, memos: [createMemo(body), ...draft.memos] }));
@@ -901,7 +925,33 @@ function App() {
         </div>
         <div className="brand">
           <ListChecks size={21} />
-          <span>{ui.activeTab === 'tasks' ? currentList?.title || 'メイン' : 'Tasktori'}</span>
+          {ui.activeTab === 'tasks' ? (
+            <div className="headerListWrap">
+              <button className="headerListButton" onClick={() => setHeaderListMenuOpen(!headerListMenuOpen)}>
+                {currentList?.title || 'メイン'}
+              </button>
+              {headerListMenuOpen && (
+                <div className="listMenu headerListMenu">
+                  {headerRenaming ? (
+                    <div className="renameBox">
+                      <input value={headerListTitleDraft} onChange={(event) => setHeaderListTitleDraft(event.target.value)} autoFocus />
+                      <button onClick={saveCurrentListName}>保存</button>
+                    </div>
+                  ) : (
+                    <>
+                      <button onClick={addTaskList}>タスク一覧を追加</button>
+                      <button onClick={() => setHeaderRenaming(true)}>名前変更</button>
+                      <button className="dangerMenuItem" onClick={() => deleteTaskList(currentList.id)} disabled={!canDeleteCurrentList}>
+                        削除
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <span>Tasktori</span>
+          )}
         </div>
         <div className="headerAction">{headerAction}</div>
       </header>
@@ -938,6 +988,8 @@ function App() {
             onSetFilter={(taskFilter) => setUi((current) => ({ ...current, taskFilter, todayOnly: false }))}
             onSetSort={setTaskSort}
             onTogglePriority={() => setPriorityMode(!priorityMode)}
+            onExpandAll={() => setVisibleTasksExpanded(true)}
+            onCollapseAll={() => setVisibleTasksExpanded(false)}
             onSelectMode={() => setTaskSelectMode(true)}
             onCancelSelect={() => {
               setTaskSelectMode(false);
@@ -973,9 +1025,7 @@ function App() {
       )}
 
       {ui.activeTab === 'memos' && (
-        route.name === 'memoEdit' ? (
-          <MemoEditor memo={route.memoId === 'new' ? null : selectedMemo} onSave={saveMemo} onDraft={setMemoDraft} onUndo={() => dispatch({ type: 'UNDO' })} onRedo={() => dispatch({ type: 'REDO' })} canUndo={history.past.length > 0} canRedo={history.future.length > 0} />
-        ) : (
+        <>
           <MemoScreen
             memos={filteredMemos}
             search={memoSearch}
@@ -1001,7 +1051,10 @@ function App() {
             onDeleteSelected={deleteSelectedMemos}
             onDeleteMemo={deleteMemo}
           />
-        )
+          {route.name === 'memoEdit' && (
+            <MemoEditor memo={route.memoId === 'new' ? null : selectedMemo} onSave={saveMemo} onDraft={setMemoDraft} onUndo={() => dispatch({ type: 'UNDO' })} onRedo={() => dispatch({ type: 'REDO' })} canUndo={history.past.length > 0} canRedo={history.future.length > 0} />
+          )}
+        </>
       )}
 
       {ui.activeTab === 'settings' && (
@@ -1109,6 +1162,8 @@ function TaskScreen(props) {
     onSetFilter,
     onSetSort,
     onTogglePriority,
+    onExpandAll,
+    onCollapseAll,
     onSelectMode,
     onCancelSelect,
     onToggleSelect,
@@ -1177,12 +1232,6 @@ function TaskScreen(props) {
       }}
     >
       <div className="listSwitcher compactControls" onClick={(event) => event.stopPropagation()}>
-        <button className="plainIcon" onClick={() => onSwitchList(-1)} aria-label="前の一覧" disabled={lists.length <= 1}>
-          <ChevronLeft size={20} />
-        </button>
-        <button className="plainIcon" onClick={() => onSwitchList(1)} aria-label="次の一覧" disabled={lists.length <= 1}>
-          <ChevronRight size={20} />
-        </button>
         <button className={`textButton ${todayOnly ? 'active' : ''}`} onClick={onToggleTodayOnly}>
           今日
         </button>
@@ -1199,6 +1248,8 @@ function TaskScreen(props) {
         <button className={`textButton ${priorityMode ? 'active' : ''}`} onClick={onTogglePriority}>
           優先度編集
         </button>
+        <button className="textButton" onClick={onExpandAll}>全て開く</button>
+        <button className="textButton" onClick={onCollapseAll}>全て閉じる</button>
         <button className={`textButton ${selectMode ? 'active' : ''}`} onClick={selectMode ? onCancelSelect : onSelectMode}>
           {selectMode ? 'キャンセル' : '選択'}
         </button>
@@ -1385,12 +1436,23 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
   const [toolMenu, setToolMenu] = useState(null);
   const [dragY, setDragY] = useState(0);
   const [closing, setClosing] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const touchStartRef = useRef(null);
   const dateInputRef = useRef(null);
 
   useEffect(() => {
     setTitleDraft(task.title);
   }, [task.id, task.title]);
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const previousTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.touchAction = previousTouchAction;
+    };
+  }, []);
 
   const saveTitle = () => {
     const parsed = parseDeadline(titleDraft);
@@ -1436,9 +1498,12 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
       className={`sheetBackdrop ${closing ? 'closing' : ''}`}
       onClick={closeSheet}
       onWheel={(event) => event.preventDefault()}
+      onTouchMove={(event) => {
+        if (event.currentTarget === event.target) event.preventDefault();
+      }}
     >
       <section
-        className={`taskSheet ${closing ? 'closing' : ''}`}
+        className={`taskSheet ${closing ? 'closing' : ''} ${dragging ? 'dragging' : ''}`}
         style={{ transform: `translateY(${dragY}px)` }}
         onClick={(event) => event.stopPropagation()}
         onTouchStart={(event) => {
@@ -1452,12 +1517,14 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
           const dy = Math.max(0, touch.clientY - start.y);
           if (dy > 4) {
             event.preventDefault();
+            setDragging(true);
             setDragY(dy);
           }
         }}
         onTouchEnd={() => {
           if (dragY > 96) closeSheet();
           else setDragY(0);
+          setDragging(false);
           touchStartRef.current = null;
         }}
       >
@@ -1704,12 +1771,20 @@ function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo })
   const [body, setBody] = useState(memo?.body || '');
   const [dragX, setDragX] = useState(0);
   const [closing, setClosing] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const memoId = memo?.id || 'new';
   const touchStartRef = useRef(null);
+  const textareaRef = useRef(null);
   useEffect(() => {
     onDraft({ memoId, body });
   }, [memoId, body, onDraft]);
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.max(160, textarea.scrollHeight)}px`;
+  }, [body]);
   useEffect(() => {
     const updateKeyboardOffset = () => {
       const viewport = window.visualViewport;
@@ -1730,7 +1805,7 @@ function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo })
   };
   return (
     <main
-      className={`memoEditorView ${closing ? 'closing' : ''}`}
+      className={`memoEditorView ${closing ? 'closing' : ''} ${dragging ? 'dragging' : ''}`}
       style={{ transform: `translateX(${dragX}px)`, '--keyboard-offset': `${keyboardOffset}px` }}
       onTouchStart={(event) => {
         const touch = event.touches[0];
@@ -1744,6 +1819,7 @@ function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo })
         const dy = Math.abs(touch.clientY - start.y);
         if (dx > 4 && dy < 80) {
           event.preventDefault();
+          setDragging(true);
           setDragX(dx);
         }
       }}
@@ -1753,18 +1829,22 @@ function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo })
         touchStartRef.current = null;
         if (start && touch.clientX - start.x > 110 && Math.abs(touch.clientY - start.y) < 80) save();
         else setDragX(0);
+        setDragging(false);
       }}
     >
       <button className="editorBackButton" onClick={save} aria-label="保存して戻る">
         <ArrowLeft size={24} />
       </button>
-      <textarea className="memoEditorInput" value={body} onChange={(event) => setBody(event.target.value)} placeholder="メモを書く" autoFocus />
+      <textarea ref={textareaRef} className="memoEditorInput" value={body} onChange={(event) => setBody(event.target.value)} placeholder="メモを書く" autoFocus />
       <div className="editorFloatingHistory">
         <button className="iconButton" onClick={onUndo} disabled={!canUndo} aria-label="戻る">
           <Undo2 size={20} />
         </button>
         <button className="iconButton" onClick={onRedo} disabled={!canRedo} aria-label="進む">
           <Redo2 size={20} />
+        </button>
+        <button className="iconButton" onClick={save} aria-label="保存して戻る">
+          <Save size={20} />
         </button>
       </div>
     </main>
