@@ -1052,7 +1052,7 @@ function App() {
             onDeleteMemo={deleteMemo}
           />
           {route.name === 'memoEdit' && (
-            <MemoEditor memo={route.memoId === 'new' ? null : selectedMemo} onSave={saveMemo} onDraft={setMemoDraft} onUndo={() => dispatch({ type: 'UNDO' })} onRedo={() => dispatch({ type: 'REDO' })} canUndo={history.past.length > 0} canRedo={history.future.length > 0} />
+            <MemoEditor memo={route.memoId === 'new' ? null : selectedMemo} onSave={saveMemo} onDraft={setMemoDraft} />
           )}
         </>
       )}
@@ -1248,8 +1248,8 @@ function TaskScreen(props) {
         <button className={`textButton ${priorityMode ? 'active' : ''}`} onClick={onTogglePriority}>
           優先度編集
         </button>
-        <button className="textButton" onClick={onExpandAll}>全て開く</button>
-        <button className="textButton" onClick={onCollapseAll}>全て閉じる</button>
+        <button className="textButton" onClick={onExpandAll}>開く</button>
+        <button className="textButton" onClick={onCollapseAll}>閉じる</button>
         <button className={`textButton ${selectMode ? 'active' : ''}`} onClick={selectMode ? onCancelSelect : onSelectMode}>
           {selectMode ? 'キャンセル' : '選択'}
         </button>
@@ -1437,6 +1437,7 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
   const [dragY, setDragY] = useState(0);
   const [closing, setClosing] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [sheetTransition, setSheetTransition] = useState(true);
   const touchStartRef = useRef(null);
   const dateInputRef = useRef(null);
 
@@ -1488,8 +1489,33 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
 
   const priorityLabel = `優先度${task.priority}`;
   const closeSheet = () => {
+    setSheetTransition(true);
+    setDragY(window.innerHeight);
     setClosing(true);
     window.setTimeout(onClose, 180);
+  };
+  const beginSheetDrag = (event) => {
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    setSheetTransition(false);
+  };
+  const moveSheetDrag = (event) => {
+    const start = touchStartRef.current;
+    if (!start) return;
+    const touch = event.touches[0];
+    const dy = Math.max(0, touch.clientY - start.y);
+    if (dy > 2) {
+      event.preventDefault();
+      setDragging(true);
+      setDragY(dy);
+    }
+  };
+  const endSheetDrag = () => {
+    setSheetTransition(true);
+    if (dragY > 72) closeSheet();
+    else setDragY(0);
+    setDragging(false);
+    touchStartRef.current = null;
   };
   const currentListTitle = lists.find((list) => list.id === task.listId)?.title || 'メイン';
 
@@ -1504,32 +1530,13 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
     >
       <section
         className={`taskSheet ${closing ? 'closing' : ''} ${dragging ? 'dragging' : ''}`}
-        style={{ transform: `translateY(${dragY}px)` }}
+        style={{ transform: `translateY(${dragY}px)`, transition: sheetTransition ? undefined : 'none' }}
         onClick={(event) => event.stopPropagation()}
-        onTouchStart={(event) => {
-          const touch = event.touches[0];
-          touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-        }}
-        onTouchMove={(event) => {
-          const start = touchStartRef.current;
-          if (!start) return;
-          const touch = event.touches[0];
-          const dy = Math.max(0, touch.clientY - start.y);
-          if (dy > 4) {
-            event.preventDefault();
-            setDragging(true);
-            setDragY(dy);
-          }
-        }}
-        onTouchEnd={() => {
-          if (dragY > 96) closeSheet();
-          else setDragY(0);
-          setDragging(false);
-          touchStartRef.current = null;
-        }}
       >
-        <div className="sheetHandle" />
-        <div className="sheetTop">
+        <div className="sheetDragZone" onTouchStart={beginSheetDrag} onTouchMove={moveSheetDrag} onTouchEnd={endSheetDrag}>
+          <div className="sheetHandle" />
+        </div>
+        <div className="sheetTop" onTouchStart={beginSheetDrag} onTouchMove={moveSheetDrag} onTouchEnd={endSheetDrag}>
           <button className="sheetIconButton" onClick={closeSheet} aria-label="閉じる">
             <X size={22} />
           </button>
@@ -1767,8 +1774,10 @@ function MemoScreen(props) {
   );
 }
 
-function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo }) {
+function MemoEditor({ memo, onSave, onDraft }) {
   const [body, setBody] = useState(memo?.body || '');
+  const [textPast, setTextPast] = useState([]);
+  const [textFuture, setTextFuture] = useState([]);
   const [dragX, setDragX] = useState(0);
   const [closing, setClosing] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -1800,8 +1809,32 @@ function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo })
     };
   }, []);
   const save = () => {
+    setDragX(window.innerWidth);
     setClosing(true);
     window.setTimeout(() => onSave(memoId, body), 160);
+  };
+  const changeBody = (value) => {
+    setTextPast((past) => [...past.slice(-49), body]);
+    setTextFuture([]);
+    setBody(value);
+  };
+  const undoText = () => {
+    setTextPast((past) => {
+      if (past.length === 0) return past;
+      const previous = past[past.length - 1];
+      setTextFuture((future) => [body, ...future]);
+      setBody(previous);
+      return past.slice(0, -1);
+    });
+  };
+  const redoText = () => {
+    setTextFuture((future) => {
+      if (future.length === 0) return future;
+      const next = future[0];
+      setTextPast((past) => [...past.slice(-49), body]);
+      setBody(next);
+      return future.slice(1);
+    });
   };
   return (
     <main
@@ -1827,7 +1860,7 @@ function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo })
         const start = touchStartRef.current;
         const touch = event.changedTouches[0];
         touchStartRef.current = null;
-        if (start && touch.clientX - start.x > 110 && Math.abs(touch.clientY - start.y) < 80) save();
+        if (start && touch.clientX - start.x > 64 && Math.abs(touch.clientY - start.y) < 96) save();
         else setDragX(0);
         setDragging(false);
       }}
@@ -1835,12 +1868,12 @@ function MemoEditor({ memo, onSave, onDraft, onUndo, onRedo, canUndo, canRedo })
       <button className="editorBackButton" onClick={save} aria-label="保存して戻る">
         <ArrowLeft size={24} />
       </button>
-      <textarea ref={textareaRef} className="memoEditorInput" value={body} onChange={(event) => setBody(event.target.value)} placeholder="メモを書く" autoFocus />
+      <textarea ref={textareaRef} className="memoEditorInput" value={body} onChange={(event) => changeBody(event.target.value)} placeholder="メモを書く" autoFocus />
       <div className="editorFloatingHistory">
-        <button className="iconButton" onClick={onUndo} disabled={!canUndo} aria-label="戻る">
+        <button className="iconButton" onClick={undoText} disabled={textPast.length === 0} aria-label="戻る">
           <Undo2 size={20} />
         </button>
-        <button className="iconButton" onClick={onRedo} disabled={!canRedo} aria-label="進む">
+        <button className="iconButton" onClick={redoText} disabled={textFuture.length === 0} aria-label="進む">
           <Redo2 size={20} />
         </button>
         <button className="iconButton" onClick={save} aria-label="保存して戻る">
