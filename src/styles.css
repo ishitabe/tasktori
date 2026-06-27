@@ -1,0 +1,1225 @@
+:root {
+  color: #17211f;
+  background: #f7f3ec;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #f7f3ec;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.appShell {
+  min-height: 100vh;
+  padding: env(safe-area-inset-top) 0 calc(94px + env(safe-area-inset-bottom));
+}
+
+.topBar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 100px 1fr 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(247, 243, 236, 0.94);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(23, 33, 31, 0.08);
+}
+
+.historyButtons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #1f6f68;
+  font-weight: 800;
+}
+
+.headerAction {
+  display: flex;
+  justify-content: end;
+}
+
+.iconButton,
+.plainIcon,
+.addButton,
+.primaryButton,
+.textButton,
+.blastButton {
+  border: 0;
+  cursor: pointer;
+}
+
+.iconButton,
+.blastButton {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f6f68;
+  box-shadow: 0 1px 0 rgba(23, 33, 31, 0.08);
+}
+
+.iconButton:disabled,
+.blastButton:disabled,
+.textButton:disabled {
+  color: #a6aaa5;
+  background: #ebe7df;
+  cursor: default;
+}
+
+.iconButton.danger,
+.plainIcon.danger {
+  color: #b33b32;
+}
+
+.iconButton.quiet {
+  box-shadow: none;
+  background: #efe9de;
+}
+
+.blastButton {
+  background: #fff0d1;
+  color: #8a4c00;
+}
+
+.listView,
+.detailView,
+.memoView,
+.settingsView {
+  width: min(100%, 680px);
+  margin: 0 auto;
+  padding: 14px;
+}
+
+.listView,
+.memoView {
+  min-height: calc(100vh - 150px);
+}
+
+.listSwitcher {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px 44px;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  margin: 6px 0 14px;
+}
+
+.listSwitcher h1 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.42rem;
+  line-height: 1.1;
+}
+
+.listTitleWrap {
+  position: relative;
+  min-width: 0;
+}
+
+.listTitleButton {
+  width: 100%;
+  min-height: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #17211f;
+  font-size: 1.42rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.listMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 34;
+  width: min(240px, 70vw);
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(23, 33, 31, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(39, 49, 45, 0.14);
+  transform: translateX(-50%);
+}
+
+.listMenu button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 7px;
+  background: #e4eee9;
+  color: #1f6f68;
+  font-weight: 800;
+}
+
+.listMenu button:disabled {
+  color: #a6aaa5;
+  background: #ebe7df;
+}
+
+.listMenu .dangerMenuItem {
+  color: #b33b32;
+  background: #f8e5df;
+}
+
+.renameBox {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px;
+  gap: 6px;
+}
+
+.renameBox input {
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid #d8d0c4;
+  border-radius: 7px;
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  color: #66736f;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.plainIcon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #66736f;
+}
+
+.plainIcon:disabled {
+  color: #b9afa0;
+}
+
+.taskToolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 16px;
+}
+
+.taskToolbar .textButton:last-child {
+  margin-left: auto;
+}
+
+.textButton {
+  min-height: 42px;
+  padding: 0 13px;
+  border-radius: 8px;
+  color: #1f6f68;
+  background: #e4eee9;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.textButton.active {
+  color: #17211f;
+  background: #f3c969;
+}
+
+.textButton.dangerText {
+  color: #b33b32;
+  background: #f8e5df;
+}
+
+.sortControl {
+  position: relative;
+}
+
+.sortMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 32;
+  display: grid;
+  gap: 5px;
+  width: 128px;
+  padding: 6px;
+  border: 1px solid rgba(23, 33, 31, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(39, 49, 45, 0.12);
+}
+
+.sortMenu button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #17211f;
+  font-weight: 800;
+  text-align: left;
+}
+
+.sortMenu button.selected {
+  background: #f3c969;
+}
+
+.taskList,
+.memoList {
+  display: grid;
+  gap: 10px;
+}
+
+.taskItem,
+.memoItem {
+  position: relative;
+  border: 1px solid rgba(23, 33, 31, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(39, 49, 45, 0.06);
+  overflow: hidden;
+}
+
+.taskItem.completing {
+  pointer-events: none;
+  animation: taskComplete 520ms cubic-bezier(0.2, 0.9, 0.22, 1) forwards;
+}
+
+.taskItem.completing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(31, 111, 104, 0), rgba(243, 201, 105, 0.22), rgba(31, 111, 104, 0));
+  transform: translateX(-120%);
+  animation: taskShine 420ms ease-out forwards;
+}
+
+.taskItem.completing .checkWrap span {
+  border-color: #1f6f68;
+  background: #1f6f68;
+  box-shadow: inset 0 0 0 5px #ffffff;
+  animation: checkPop 260ms cubic-bezier(0.18, 1.35, 0.35, 1) both;
+}
+
+.taskItem.blastAway,
+.memoItem.blastAway {
+  pointer-events: none;
+  animation: blastAway 920ms cubic-bezier(0.12, 0.86, 0.32, 1) forwards;
+}
+
+.taskItem.blastAway:nth-child(2n),
+.memoItem.blastAway:nth-child(2n) {
+  animation-name: blastAwayAlt;
+  animation-delay: 70ms;
+}
+
+.taskItem.blastAway:nth-child(3n),
+.memoItem.blastAway:nth-child(3n) {
+  animation-delay: 130ms;
+}
+
+.taskMain {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: 28px 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.expandSlot {
+  width: 28px;
+}
+
+.checkWrap {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.checkWrap input,
+.subtaskCheck input {
+  position: absolute;
+  opacity: 0;
+}
+
+.checkWrap span {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #8aa19b;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.checkWrap input:checked + span {
+  border-color: #1f6f68;
+  background: #1f6f68;
+  box-shadow: inset 0 0 0 5px #ffffff;
+}
+
+.taskText {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.taskText strong {
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+}
+
+.taskText time {
+  color: #b33b32;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.taskItem.done .taskText strong,
+.subtaskCheck.done span {
+  color: #8c9692;
+  text-decoration: line-through;
+}
+
+.priorityBar {
+  display: grid;
+  grid-template-columns: repeat(4, 18px);
+  gap: 4px;
+  padding-left: 4px;
+}
+
+.priorityBar button {
+  width: 18px;
+  height: 28px;
+  border: 1px solid #d7d0c4;
+  border-radius: 5px;
+  background: #f3efe7;
+}
+
+.priorityBar button.filled {
+  background: #f3c969;
+  border-color: #c99b24;
+}
+
+.expandedPanel {
+  border-top: 1px solid #f0ece5;
+  padding: 10px 16px 14px 82px;
+  display: grid;
+  gap: 10px;
+}
+
+.memoPreview {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #47504d;
+  line-height: 1.5;
+}
+
+.subtaskList {
+  display: grid;
+  gap: 8px;
+}
+
+.subtaskCheck {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  color: #24312e;
+}
+
+.subtaskCheck::before {
+  content: "";
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border: 2px solid #8aa19b;
+  border-radius: 6px;
+}
+
+.subtaskCheck:has(input:checked)::before {
+  border-color: #1f6f68;
+  background: #1f6f68;
+  box-shadow: inset 0 0 0 4px #ffffff;
+}
+
+.emptyState {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  color: #66736f;
+}
+
+.emptyState p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.addDock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(68px + env(safe-area-inset-bottom));
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  padding: 10px 16px;
+  pointer-events: none;
+}
+
+.addDock.open {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  width: min(100%, 680px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 14px;
+  background: rgba(247, 243, 236, 0.96);
+  border-top: 1px solid rgba(23, 33, 31, 0.08);
+  pointer-events: auto;
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+}
+
+.addDock textarea {
+  width: 100%;
+  min-height: 138px;
+  max-height: 38vh;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid #d8d0c4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17211f;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px rgba(39, 49, 45, 0.1);
+}
+
+.smartInput {
+  display: grid;
+  gap: 10px;
+}
+
+.smartTextareaWrap {
+  position: relative;
+  min-height: 148px;
+  border: 1px solid #d8d0c4;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgba(39, 49, 45, 0.1);
+  overflow: hidden;
+}
+
+.smartTextareaWrap textarea,
+.highlightLayer {
+  width: 100%;
+  min-height: 148px;
+  padding: 12px;
+  border: 0;
+  border-radius: 8px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.smartTextareaWrap textarea {
+  position: relative;
+  z-index: 2;
+  resize: vertical;
+  background: transparent;
+  color: transparent;
+  caret-color: #17211f;
+  box-shadow: none;
+  outline: 0;
+}
+
+.smartTextareaWrap textarea::selection {
+  background: rgba(31, 111, 104, 0.2);
+}
+
+.highlightLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  color: #17211f;
+  pointer-events: none;
+}
+
+.deadlineHighlight {
+  padding: 1px 3px;
+  border-radius: 5px;
+  background: #dceefe;
+  color: #0b4f83;
+}
+
+.recognitionPanel,
+.registrationPreview {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid rgba(23, 33, 31, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.recognitionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.recognitionPanel p,
+.registrationPreview p {
+  margin: 0;
+  color: #66736f;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.recognizedChip {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: #dceefe;
+  color: #0b4f83;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.deadlineMenu {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.deadlineMenu button {
+  min-height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: #e4eee9;
+  color: #1f6f68;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.hiddenDatePicker {
+  position: fixed;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.previewTask {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 4px 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0ece5;
+}
+
+.previewTask span {
+  color: #66736f;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.previewTask b {
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+}
+
+.previewTask ul {
+  grid-column: 2;
+  margin: 2px 0 0;
+  padding-left: 18px;
+  color: #47504d;
+  font-size: 0.84rem;
+}
+
+.addButton {
+  width: 64px;
+  height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #1f6f68;
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(31, 111, 104, 0.3);
+  pointer-events: auto;
+}
+
+.dockActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.primaryButton {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: #1f6f68;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.detailHeader {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.detailHeader h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 1.22rem;
+}
+
+.fieldLabel {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 14px;
+  color: #47504d;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.fieldLabel input,
+.fieldLabel select,
+.fieldLabel textarea,
+.newSubtaskRow input,
+.detailSubtaskRow input[type="text"],
+.detailSubtaskRow input:not([type]) {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #d8d0c4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17211f;
+}
+
+.fieldLabel select:disabled {
+  color: #8c9692;
+  background: #eee9df;
+}
+
+.fieldHint {
+  color: #8c6d33;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.memoInput {
+  min-height: 118px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.priorityPicker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.priorityPicker button {
+  min-height: 44px;
+  border: 1px solid #d8d0c4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17211f;
+  font-weight: 800;
+}
+
+.priorityPicker button.selected {
+  background: #f3c969;
+  border-color: #c99b24;
+}
+
+.detailSection {
+  margin-top: 8px;
+}
+
+.detailSection h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.detailSubtasks {
+  display: grid;
+  gap: 8px;
+}
+
+.detailSubtaskRow {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.detailSubtaskRow input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: #1f6f68;
+}
+
+.newSubtaskRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.memoToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.memoToolbar:has(.searchBox + .textButton:last-child) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.searchBox {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid #d8d0c4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #66736f;
+}
+
+.searchBox input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.memoItem {
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+}
+
+.memoItem input {
+  width: 22px;
+  height: 22px;
+  accent-color: #1f6f68;
+}
+
+.memoItem strong,
+.memoItem p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memoItem strong {
+  display: block;
+}
+
+.memoItem p {
+  margin: 5px 0 0;
+  color: #66736f;
+  font-size: 0.88rem;
+}
+
+.memoEditorInput {
+  width: 100%;
+  min-height: calc(100vh - 190px);
+  padding: 14px;
+  border: 1px solid #d8d0c4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17211f;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.settingsView h1 {
+  margin: 8px 0 16px;
+  font-size: 1.4rem;
+}
+
+.settingsList {
+  display: grid;
+  gap: 10px;
+}
+
+.settingsList button {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid rgba(23, 33, 31, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17211f;
+  font-weight: 800;
+  text-align: left;
+}
+
+.settingsList button:disabled {
+  color: #a6aaa5;
+  background: #ebe7df;
+}
+
+.settingsList .dangerSetting {
+  color: #b33b32;
+}
+
+.settingsNote {
+  margin: 14px 0 0;
+  color: #66736f;
+  font-weight: 700;
+}
+
+.bottomTabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 35;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(23, 33, 31, 0.08);
+  background: rgba(255, 252, 246, 0.96);
+  backdrop-filter: blur(14px);
+}
+
+.bottomTabs button {
+  min-height: 52px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #66736f;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.bottomTabs button.active {
+  background: #e4eee9;
+  color: #1f6f68;
+}
+
+.blastScene {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.stormBird {
+  position: absolute;
+  top: 116px;
+  left: -88px;
+  width: 76px;
+  height: 46px;
+  animation: birdFlight 880ms cubic-bezier(0.2, 0.86, 0.22, 1) forwards;
+}
+
+.stormBird .body {
+  position: absolute;
+  left: 28px;
+  top: 17px;
+  width: 25px;
+  height: 18px;
+  border-radius: 50% 55% 45% 50%;
+  background: #1f6f68;
+  box-shadow: 15px -3px 0 -7px #f3c969;
+}
+
+.stormBird .body::after {
+  content: "";
+  position: absolute;
+  right: -10px;
+  top: 5px;
+  border-left: 12px solid #f3c969;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+.stormBird .wing {
+  position: absolute;
+  width: 35px;
+  height: 20px;
+  border-radius: 90% 10% 90% 10%;
+  background: #2e8f82;
+  transform-origin: right center;
+}
+
+.stormBird .wing.left {
+  left: 9px;
+  top: 4px;
+  animation: wingFlapLeft 140ms ease-in-out infinite alternate;
+}
+
+.stormBird .wing.right {
+  left: 9px;
+  top: 25px;
+  animation: wingFlapRight 140ms ease-in-out infinite alternate;
+}
+
+.windLine {
+  position: absolute;
+  left: -42vw;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(31, 111, 104, 0.2);
+  box-shadow: 0 14px 0 rgba(243, 201, 105, 0.26);
+  animation: windRush 780ms ease-out forwards;
+}
+
+.line1 {
+  top: 170px;
+  width: 76vw;
+}
+
+.line2 {
+  top: 250px;
+  width: 58vw;
+  animation-delay: 80ms;
+}
+
+.line3 {
+  top: 355px;
+  width: 84vw;
+  animation-delay: 140ms;
+}
+
+.line4 {
+  top: 470px;
+  width: 64vw;
+  animation-delay: 190ms;
+}
+
+@keyframes taskComplete {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    max-height: 220px;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  42% {
+    opacity: 1;
+    transform: translateX(8px) scale(1.018);
+    max-height: 220px;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(42px) scale(0.96);
+    max-height: 0;
+    margin-top: -10px;
+    margin-bottom: -10px;
+  }
+}
+
+@keyframes taskShine {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes checkPop {
+  0% {
+    transform: scale(0.72);
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes blastAway {
+  0% {
+    opacity: 1;
+    transform: translateX(0) rotate(0) scale(1);
+    max-height: 220px;
+  }
+  34% {
+    opacity: 1;
+    transform: translateX(18px) rotate(1.5deg) scale(1.02);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(118vw) rotate(13deg) scale(0.86);
+    max-height: 0;
+    margin-top: -10px;
+    margin-bottom: -10px;
+  }
+}
+
+@keyframes blastAwayAlt {
+  0% {
+    opacity: 1;
+    transform: translateX(0) rotate(0) scale(1);
+    max-height: 220px;
+  }
+  36% {
+    opacity: 1;
+    transform: translateX(12px) translateY(-4px) rotate(-1deg) scale(1.015);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(112vw) translateY(-32px) rotate(-10deg) scale(0.88);
+    max-height: 0;
+    margin-top: -10px;
+    margin-bottom: -10px;
+  }
+}
+
+@keyframes birdFlight {
+  0% {
+    transform: translateX(0) translateY(18px) scale(0.78);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  68% {
+    opacity: 1;
+    transform: translateX(56vw) translateY(-12px) scale(1.18);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(112vw) translateY(-24px) scale(1);
+  }
+}
+
+@keyframes wingFlapLeft {
+  from {
+    transform: rotate(-26deg);
+  }
+  to {
+    transform: rotate(28deg);
+  }
+}
+
+@keyframes wingFlapRight {
+  from {
+    transform: rotate(22deg);
+  }
+  to {
+    transform: rotate(-18deg);
+  }
+}
+
+@keyframes windRush {
+  0% {
+    opacity: 0;
+    transform: translateX(0) scaleX(0.65);
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(146vw) scaleX(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taskItem.completing,
+  .taskItem.completing::after,
+  .taskItem.completing .checkWrap span,
+  .taskItem.blastAway,
+  .memoItem.blastAway,
+  .stormBird,
+  .stormBird .wing,
+  .windLine {
+    animation-duration: 1ms;
+  }
+}
+
+@media (min-width: 720px) {
+  .appShell {
+    padding-bottom: 112px;
+  }
+
+  .listView,
+  .detailView,
+  .memoView,
+  .settingsView {
+    padding-top: 24px;
+  }
+}
