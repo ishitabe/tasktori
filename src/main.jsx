@@ -12,6 +12,7 @@ import {
   Ellipsis,
   FileText,
   Flag,
+  Focus,
   History,
   ListChecks,
   Notebook,
@@ -35,6 +36,7 @@ const UI_KEY = 'tasktori.ui.v2';
 const HISTORY_LIMIT = 100;
 const COMPLETE_ANIMATION_MS = 520;
 const BLAST_ANIMATION_MS = 980;
+const FOCUS_TIMER_KEY = 'tasktori.focusTimer.v1';
 
 const DEFAULT_LIST_ID = 'main';
 const PRIORITIES = [1, 2, 3, 4];
@@ -216,10 +218,10 @@ const loadUi = () => {
   try {
     const parsed = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
     return {
-      activeTab: ['tasks', 'memos', 'settings'].includes(parsed.activeTab) ? parsed.activeTab : 'tasks',
+      activeTab: ['tasks', 'memos', 'focus', 'settings'].includes(parsed.activeTab) ? parsed.activeTab : 'tasks',
       currentListId: parsed.currentListId || DEFAULT_LIST_ID,
-      todayOnly: Boolean(parsed.todayOnly),
-      taskFilter: ['all', 'today', 'overdue', 'deadline', 'none', 'done'].includes(parsed.taskFilter) ? parsed.taskFilter : 'all',
+      todayOnly: false,
+      taskFilter: ['all', 'today', 'tomorrow', 'overdue', 'deadline', 'none', 'done'].includes(parsed.taskFilter) ? parsed.taskFilter : 'all',
       sortBy: parsed.sortBy === 'created' || parsed.sortBy?.today === 'created' ? 'created' : 'recommended',
     };
   } catch {
@@ -535,8 +537,12 @@ const taskGroupRank = (task) => {
 const isTodayOrOverdue = (task) =>
   Boolean(task.deadline && new Date(task.deadline) < startOfDay(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1)));
 
+const isTomorrowOrEarlier = (task) =>
+  Boolean(task.deadline && new Date(task.deadline) < startOfDay(new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 2)));
+
 const taskMatchesFilter = (task, filter) => {
   if (filter === 'today') return isTodayOrOverdue(task);
+  if (filter === 'tomorrow') return isTomorrowOrEarlier(task);
   if (filter === 'overdue') return Boolean(task.deadline && new Date(task.deadline) < new Date());
   if (filter === 'deadline') return Boolean(task.deadline);
   if (filter === 'none') return !task.deadline;
@@ -617,10 +623,10 @@ function App() {
     const active = tasks.filter((task) => {
       const inCurrentList = task.listId === currentList?.id;
       const activeTask = ui.taskFilter === 'done' || !task.done || completingIds.has(task.id);
-      return inCurrentList && activeTask && taskMatchesFilter(task, ui.todayOnly ? 'today' : ui.taskFilter);
+      return inCurrentList && activeTask && taskMatchesFilter(task, ui.taskFilter);
     });
     return sortTasks(active, ui.sortBy);
-  }, [tasks, completingIds, currentList?.id, ui.todayOnly, ui.taskFilter, ui.sortBy]);
+  }, [tasks, completingIds, currentList?.id, ui.taskFilter, ui.sortBy]);
 
   const filteredMemos = useMemo(() => {
     const query = memoSearch.trim().toLowerCase();
@@ -1060,6 +1066,10 @@ function App() {
         </>
       )}
 
+      {ui.activeTab === 'focus' && (
+        <FocusScreen />
+      )}
+
       {ui.activeTab === 'settings' && (
         <SettingsScreen
           taskCount={tasks.length}
@@ -1235,11 +1245,8 @@ function TaskScreen(props) {
       }}
     >
       <div className="listSwitcher compactControls" onClick={(event) => event.stopPropagation()}>
-        <button className={`textButton ${todayOnly ? 'active' : ''}`} onClick={onToggleTodayOnly}>
-          今日
-        </button>
         <div className="sortControl">
-          <button className={`iconButton ${taskFilter !== 'all' && !todayOnly ? 'activeIcon' : ''}`} onClick={() => setFilterOpen(!filterOpen)} aria-label="フィルター編集">
+          <button className={`iconButton ${taskFilter !== 'all' ? 'activeIcon' : ''}`} onClick={() => setFilterOpen(!filterOpen)} aria-label="フィルター編集">
             <Search size={19} />
           </button>
         </div>
@@ -1249,7 +1256,7 @@ function TaskScreen(props) {
           </button>
         </div>
         <button className={`textButton ${priorityMode ? 'active' : ''}`} onClick={onTogglePriority}>
-          優先度編集
+          優先度
         </button>
         <button className="textButton" onClick={onExpandAll}>開く</button>
         <button className="textButton" onClick={onCollapseAll}>閉じる</button>
@@ -1263,12 +1270,13 @@ function TaskScreen(props) {
           {filterOpen && [
             ['all', 'すべて'],
             ['today', '今日まで'],
+            ['tomorrow', '明日まで'],
             ['overdue', '期限切れ'],
             ['deadline', '期限あり'],
             ['none', '期限なし'],
             ['done', '完了済み'],
           ].map(([id, label]) => (
-            <button key={id} className={taskFilter === id && !todayOnly ? 'selected' : ''} onClick={() => { onSetFilter(id); setFilterOpen(false); }}>
+            <button key={id} className={taskFilter === id ? 'selected' : ''} onClick={() => { onSetFilter(id); setFilterOpen(false); }}>
               {label}
             </button>
           ))}
@@ -1311,7 +1319,7 @@ function TaskScreen(props) {
         {visibleTasks.length === 0 ? (
           <div className="emptyState">
             <History size={28} />
-            <p>{todayOnly ? '今日のタスクはありません' : 'タスクはありません'}</p>
+            <p>タスクはありません</p>
           </div>
         ) : (
           visibleTasks.map((task) => (
@@ -1930,10 +1938,178 @@ function SettingsScreen({ taskCount, memoCount, onDeleteTasks, onDeleteMemos, on
   );
 }
 
+const FOCUS_MODES = {
+  work: { label: '集中', minutes: 25 },
+  short: { label: '短い休憩', minutes: 5 },
+  long: { label: '長い休憩', minutes: 15 },
+};
+
+function FocusScreen() {
+  const [mode, setMode] = useState('work');
+  const [running, setRunning] = useState(false);
+  const [remaining, setRemaining] = useState(FOCUS_MODES.work.minutes * 60);
+  const [notificationStatus, setNotificationStatus] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
+  const endAtRef = useRef(null);
+  const notifiedRef = useRef(false);
+  const total = FOCUS_MODES[mode].minutes * 60;
+  const progress = total ? 1 - remaining / total : 0;
+  const minutes = Math.floor(remaining / 60);
+  const seconds = remaining % 60;
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(FOCUS_TIMER_KEY) || '{}');
+      if (!FOCUS_MODES[saved.mode]) return;
+      const savedTotal = FOCUS_MODES[saved.mode].minutes * 60;
+      setMode(saved.mode);
+      if (saved.running && saved.endAt) {
+        const next = Math.max(0, Math.ceil((saved.endAt - Date.now()) / 1000));
+        setRemaining(next || savedTotal);
+        if (next > 0) {
+          endAtRef.current = saved.endAt;
+          setRunning(true);
+        }
+      } else if (Number.isFinite(saved.remaining)) {
+        setRemaining(Math.min(saved.remaining, savedTotal));
+      }
+    } catch {}
+  }, []);
+
+  const persistTimer = (next) => {
+    localStorage.setItem(FOCUS_TIMER_KEY, JSON.stringify(next));
+  };
+
+  const notifyFinished = async (label) => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const title = 'Tasktori';
+    const options = {
+      body: `${label}が終わりました`,
+      tag: 'tasktori-pomodoro',
+      renotify: true,
+      requireInteraction: true,
+      icon: `${import.meta.env.BASE_URL}icons/icon-192.svg`,
+      badge: `${import.meta.env.BASE_URL}icons/icon-192.svg`,
+    };
+    try {
+      const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.ready : null;
+      if (registration?.showNotification) {
+        await registration.showNotification(title, options);
+      } else {
+        new Notification(title, options);
+      }
+    } catch {
+      try {
+        new Notification(title, options);
+      } catch {}
+    }
+  };
+
+  const requestNotification = async () => {
+    if (!('Notification' in window)) {
+      setNotificationStatus('unsupported');
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    setNotificationStatus(permission);
+  };
+
+  useEffect(() => {
+    if (!running) return;
+    const tick = () => {
+      const next = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
+      setRemaining(next);
+      if (next === 0) {
+        setRunning(false);
+        endAtRef.current = null;
+        persistTimer({ mode, running: false, remaining: total });
+        playCompleteSound();
+        if (!notifiedRef.current) {
+          notifiedRef.current = true;
+          notifyFinished(FOCUS_MODES[mode].label);
+        }
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 250);
+    return () => window.clearInterval(timer);
+  }, [mode, running, total]);
+
+  const selectMode = (nextMode) => {
+    setMode(nextMode);
+    setRunning(false);
+    endAtRef.current = null;
+    notifiedRef.current = false;
+    const nextRemaining = FOCUS_MODES[nextMode].minutes * 60;
+    setRemaining(nextRemaining);
+    persistTimer({ mode: nextMode, running: false, remaining: nextRemaining });
+  };
+  const start = () => {
+    const nextRemaining = remaining <= 0 ? total : remaining;
+    if (remaining <= 0) setRemaining(total);
+    endAtRef.current = Date.now() + nextRemaining * 1000;
+    notifiedRef.current = false;
+    persistTimer({ mode, running: true, remaining: nextRemaining, endAt: endAtRef.current });
+    setRunning(true);
+    playTickSound();
+  };
+  const pause = () => {
+    const nextRemaining = endAtRef.current ? Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000)) : remaining;
+    setRunning(false);
+    endAtRef.current = null;
+    setRemaining(nextRemaining);
+    persistTimer({ mode, running: false, remaining: nextRemaining });
+  };
+  const reset = () => {
+    setRunning(false);
+    endAtRef.current = null;
+    notifiedRef.current = false;
+    setRemaining(total);
+    persistTimer({ mode, running: false, remaining: total });
+  };
+
+  return (
+    <main className="focusView">
+      <section className="pomodoroPanel">
+        <div className="timerRing" style={{ '--progress': `${progress * 360}deg` }}>
+          <div>
+            <span>{pad(minutes)}:{pad(seconds)}</span>
+            <small>{FOCUS_MODES[mode].label}</small>
+          </div>
+        </div>
+        <div className="focusActions">
+          {running ? (
+            <button className="primaryAction" onClick={pause}>一時停止</button>
+          ) : (
+            <button className="primaryAction" onClick={start}>開始</button>
+          )}
+          <button className="textButton" onClick={reset}>リセット</button>
+        </div>
+        {notificationStatus !== 'granted' && (
+          <button className="notifyButton" onClick={requestNotification} disabled={notificationStatus === 'denied' || notificationStatus === 'unsupported'}>
+            {notificationStatus === 'denied'
+              ? '通知は端末設定で許可'
+              : notificationStatus === 'unsupported'
+                ? '通知非対応'
+                : '通知を許可'}
+          </button>
+        )}
+        <div className="focusModeTabs" aria-label="集中モード">
+          {Object.entries(FOCUS_MODES).map(([id, item]) => (
+            <button key={id} className={mode === id ? 'active' : ''} onClick={() => selectMode(id)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
 function BottomTabs({ activeTab, onSwitch }) {
   const tabs = [
     { id: 'tasks', label: 'タスク', icon: ListChecks },
     { id: 'memos', label: 'メモ', icon: FileText },
+    { id: 'focus', label: '集中', icon: Focus },
     { id: 'settings', label: '設定', icon: Settings },
   ];
   return (

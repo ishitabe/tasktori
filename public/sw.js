@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tasktori-shell-v2';
-const APP_SHELL = ['/', '/manifest.webmanifest'];
+const CACHE_NAME = 'tasktori-shell-v3';
+const APP_SHELL = ['./', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -25,5 +25,18 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => caches.match(event.request)),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clients) => {
+        const existing = clients.find((client) => client.url.includes(self.registration.scope));
+        if (existing) return existing.focus();
+        return self.clients.openWindow(self.registration.scope);
+      }),
   );
 });
