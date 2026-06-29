@@ -495,14 +495,41 @@ const parseDeadline = (line, baseDate = new Date()) => {
   return { title: analyzed.title, deadline: analyzed.deadline, priority: analyzed.priority };
 };
 
+const parseBulkDeadlineHeader = (line, baseDate = new Date()) => {
+  const original = line.trim();
+  if (!original) return null;
+  const analyzed = analyzeTaskLine(original, baseDate);
+  if (!analyzed.deadline) return null;
+  const dateTimeMatches = analyzed.matches.filter((match) => match.kind === 'date' || match.kind === 'time');
+  if (dateTimeMatches.length !== analyzed.matches.length) return null;
+  let remaining = original;
+  [...dateTimeMatches]
+    .sort((a, b) => b.index - a.index)
+    .forEach((match) => {
+      const raw = match.removeRaw || match.raw;
+      remaining = remaining.slice(0, match.index) + remaining.slice(match.index + raw.length);
+    });
+  return compactTitle(remaining) ? null : analyzed.deadline;
+};
+
 const parseBulkTasks = (input, listId) => {
   const tasks = [];
   let currentParent = null;
+  let defaultDeadline = null;
   input.split(/\r?\n/).forEach((rawLine) => {
     const trimmed = rawLine.trim();
     if (!trimmed) return;
 
     const childMatch = trimmed.match(/^[・\-ー*]\s*(.+)$/);
+    if (!childMatch) {
+      const bulkDeadline = parseBulkDeadlineHeader(trimmed);
+      if (bulkDeadline) {
+        defaultDeadline = bulkDeadline;
+        currentParent = null;
+        return;
+      }
+    }
+
     if (childMatch && currentParent) {
       const parsed = parseDeadline(childMatch[1]);
       currentParent.subtasks.push(createSubtask(parsed.title));
@@ -511,7 +538,7 @@ const parseBulkTasks = (input, listId) => {
     }
 
     const parsed = parseDeadline(childMatch ? childMatch[1] : trimmed);
-    const task = createTask({ title: parsed.title, deadline: parsed.deadline, priority: parsed.priority, listId });
+    const task = createTask({ title: parsed.title, deadline: parsed.deadline || defaultDeadline, priority: parsed.priority, listId });
     tasks.push(task);
     currentParent = task;
   });
@@ -1122,7 +1149,7 @@ function SmartTaskInput({ value, listTitle, onChange }) {
             </React.Fragment>
           ))}
         </div>
-        <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={`${listTitle}に追加\n木曜 打ち合わせ 12時\n高 明日 郵便局\n・持ち物確認`} autoFocus />
+        <textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={`${listTitle}に追加\n今日\n打ち合わせ\n郵便局\n・持ち物確認`} autoFocus />
       </div>
     </div>
   );
