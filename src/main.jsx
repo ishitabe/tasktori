@@ -1843,7 +1843,7 @@ function MemoScreen(props) {
                 <div className="memoSizeMenu">
                   {[
                     ['small', '小'],
-                    ['standard', '標準'],
+                    ['standard', '中'],
                     ['large', '大'],
                   ].map(([id, label]) => (
                     <button key={id} className={memoSize === id ? 'selected' : ''} onClick={() => { onSetMemoSize(id); setSizeOpen(false); }}>
@@ -2013,17 +2013,7 @@ function MemoEditor({ memo, onSave, onDraft }) {
       <button className="editorBackButton" onClick={save} aria-label="保存して戻る">
         <ArrowLeft size={24} />
       </button>
-      <div className="memoEditorTextWrap">
-        <div className="memoEditorMirror" aria-hidden="true">
-          {body.split('\n').map((line, index) => (
-            <React.Fragment key={`${index}-${line}`}>
-              <span className={headingLines.has(index) ? 'memoHeadingLine' : ''}>{line || ' '}</span>
-              {'\n'}
-            </React.Fragment>
-          ))}
-        </div>
-        <textarea ref={textareaRef} className="memoEditorInput" value={body} onChange={(event) => changeBody(event.target.value)} placeholder="メモを書く" autoFocus />
-      </div>
+      <textarea ref={textareaRef} className="memoEditorInput" value={body} onChange={(event) => changeBody(event.target.value)} placeholder="メモを書く" autoFocus />
       <div className="editorFloatingHistory">
         <button className="textButton editorHeadingButton" onClick={toggleHeading}>
           見出し
