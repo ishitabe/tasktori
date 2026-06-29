@@ -12,7 +12,6 @@ import {
   Ellipsis,
   FileText,
   Flag,
-  Focus,
   History,
   ListChecks,
   Notebook,
@@ -36,7 +35,7 @@ const UI_KEY = 'tasktori.ui.v2';
 const HISTORY_LIMIT = 100;
 const COMPLETE_ANIMATION_MS = 520;
 const BLAST_ANIMATION_MS = 980;
-const FOCUS_TIMER_KEY = 'tasktori.focusTimer.v1';
+const HEADING_PREFIX = '\u200B::tasktori-heading::';
 
 const DEFAULT_LIST_ID = 'main';
 const PRIORITIES = [1, 2, 3, 4];
@@ -218,14 +217,15 @@ const loadUi = () => {
   try {
     const parsed = JSON.parse(localStorage.getItem(UI_KEY) || '{}');
     return {
-      activeTab: ['tasks', 'memos', 'focus', 'settings'].includes(parsed.activeTab) ? parsed.activeTab : 'tasks',
+      activeTab: ['tasks', 'memos', 'settings'].includes(parsed.activeTab) ? parsed.activeTab : 'tasks',
       currentListId: parsed.currentListId || DEFAULT_LIST_ID,
       todayOnly: false,
       taskFilter: ['all', 'today', 'tomorrow', 'overdue', 'deadline', 'none', 'done'].includes(parsed.taskFilter) ? parsed.taskFilter : 'all',
       sortBy: parsed.sortBy === 'created' || parsed.sortBy?.today === 'created' ? 'created' : 'recommended',
+      memoSize: ['small', 'standard', 'large'].includes(parsed.memoSize) ? parsed.memoSize : 'standard',
     };
   } catch {
-    return { activeTab: 'tasks', currentListId: DEFAULT_LIST_ID, todayOnly: false, taskFilter: 'all', sortBy: 'recommended' };
+    return { activeTab: 'tasks', currentListId: DEFAULT_LIST_ID, todayOnly: false, taskFilter: 'all', sortBy: 'recommended', memoSize: 'standard' };
   }
 };
 
@@ -418,6 +418,7 @@ const collectTimeCandidates = (text) =>
 const collectPriorityCandidates = (text) =>
   [
     ...collectMatches(text, /優先度\s*([1-4])/g, (match) => ({ priority: Number(match[1]), raw: match[0], kind: 'priority' })),
+    ...collectMatches(text, /(あとで|後で)/g, (match) => ({ priority: 1, raw: match[0], kind: 'priority' })),
     ...collectMatches(text, /(?:^|[\s　])([高中低])(?:$|[\s　])/g, (match) => ({
       priority: match[1] === '高' ? 4 : match[1] === '中' ? 3 : 1,
       raw: match[1],
@@ -492,7 +493,12 @@ const analyzeTaskLine = (line, baseDate = new Date()) => {
 
 const parseDeadline = (line, baseDate = new Date()) => {
   const analyzed = analyzeTaskLine(line, baseDate);
-  return { title: analyzed.title, deadline: analyzed.deadline, priority: analyzed.priority };
+  return {
+    title: analyzed.title,
+    deadline: analyzed.deadline,
+    priority: analyzed.priority,
+    hasPriority: analyzed.matches.some((match) => match.kind === 'priority'),
+  };
 };
 
 const parseBulkDeadlineHeader = (line, baseDate = new Date()) => {
@@ -512,16 +518,46 @@ const parseBulkDeadlineHeader = (line, baseDate = new Date()) => {
   return compactTitle(remaining) ? null : analyzed.deadline;
 };
 
+const parseBulkPriorityHeader = (line, baseDate = new Date()) => {
+  const original = line.trim();
+  if (!original) return null;
+  const analyzed = analyzeTaskLine(original, baseDate);
+  const priorityMatches = analyzed.matches.filter((match) => match.kind === 'priority');
+  if (priorityMatches.length !== 1 || priorityMatches.length !== analyzed.matches.length) return null;
+  let remaining = original;
+  const match = priorityMatches[0];
+  const raw = match.removeRaw || match.raw;
+  remaining = remaining.slice(0, match.index) + remaining.slice(match.index + raw.length);
+  return compactTitle(remaining) ? null : analyzed.priority;
+};
+
 const parseBulkTasks = (input, listId) => {
   const tasks = [];
   let currentParent = null;
   let defaultDeadline = null;
+  let defaultPriority = 2;
+  let memoTarget = null;
   input.split(/\r?\n/).forEach((rawLine) => {
     const trimmed = rawLine.trim();
+    if (memoTarget) {
+      memoTarget.memo = `${memoTarget.memo}${memoTarget.memo ? '\n' : ''}${rawLine.trimEnd()}`;
+      memoTarget.updatedAt = nowIso();
+      return;
+    }
     if (!trimmed) return;
 
     const childMatch = trimmed.match(/^[・\-ー*]\s*(.+)$/);
     if (!childMatch) {
+      if (trimmed === 'メモ') {
+        if (currentParent) memoTarget = currentParent;
+        return;
+      }
+      const bulkPriority = parseBulkPriorityHeader(trimmed);
+      if (bulkPriority) {
+        defaultPriority = bulkPriority;
+        currentParent = null;
+        return;
+      }
       const bulkDeadline = parseBulkDeadlineHeader(trimmed);
       if (bulkDeadline) {
         defaultDeadline = bulkDeadline;
@@ -538,7 +574,12 @@ const parseBulkTasks = (input, listId) => {
     }
 
     const parsed = parseDeadline(childMatch ? childMatch[1] : trimmed);
-    const task = createTask({ title: parsed.title, deadline: parsed.deadline || defaultDeadline, priority: parsed.priority, listId });
+    const task = createTask({
+      title: parsed.title,
+      deadline: parsed.deadline || defaultDeadline,
+      priority: parsed.hasPriority ? parsed.priority : defaultPriority,
+      listId,
+    });
     tasks.push(task);
     currentParent = task;
   });
@@ -615,9 +656,34 @@ const formatHumanDeadline = (iso) => {
 };
 
 const memoTitle = (memo) => {
-  const line = memo.body.split(/\r?\n/).find((item) => item.trim());
+  const line = stripMemoHeadingMarkers(memo.body).split(/\r?\n/).find((item) => item.trim());
   return line?.trim() || '無題メモ';
 };
+
+const stripMemoHeadingMarkers = (body = '') =>
+  body
+    .split(/\r?\n/)
+    .map((line) => line.startsWith(HEADING_PREFIX) ? line.slice(HEADING_PREFIX.length) : line)
+    .join('\n');
+
+const parseMemoEditorBody = (body = '') => {
+  const headingLines = new Set();
+  const visibleBody = body
+    .split(/\r?\n/)
+    .map((line, index) => {
+      if (!line.startsWith(HEADING_PREFIX)) return line;
+      headingLines.add(index);
+      return line.slice(HEADING_PREFIX.length);
+    })
+    .join('\n');
+  return { visibleBody, headingLines };
+};
+
+const serializeMemoEditorBody = (body, headingLines) =>
+  body
+    .split(/\r?\n/)
+    .map((line, index) => (headingLines.has(index) && line.trim() ? `${HEADING_PREFIX}${line}` : line))
+    .join('\n');
 
 function App() {
   const [history, dispatch] = useReducer(historyReducer, initialHistory);
@@ -1065,10 +1131,12 @@ function App() {
           <MemoScreen
             memos={filteredMemos}
             search={memoSearch}
+            memoSize={ui.memoSize || 'standard'}
             blasting={memoBlasting}
             selectMode={memoSelectMode}
             selection={memoSelection}
             onSearch={setMemoSearch}
+            onSetMemoSize={(memoSize) => setUi((current) => ({ ...current, memoSize }))}
             onNew={() => setRoute({ name: 'memoEdit', memoId: 'new' })}
             onOpen={(memoId) => setRoute({ name: 'memoEdit', memoId })}
             onSelectMode={() => setMemoSelectMode(true)}
@@ -1091,10 +1159,6 @@ function App() {
             <MemoEditor memo={route.memoId === 'new' ? null : selectedMemo} onSave={saveMemo} onDraft={setMemoDraft} />
           )}
         </>
-      )}
-
-      {ui.activeTab === 'focus' && (
-        <FocusScreen />
       )}
 
       {ui.activeTab === 'settings' && (
@@ -1161,14 +1225,14 @@ function renderHighlightedLine(line) {
   const parts = [];
   let cursor = 0;
   analyzed.matches
-    .filter((match) => match.kind === 'date' || match.kind === 'time')
+    .filter((match) => match.kind === 'date' || match.kind === 'time' || match.kind === 'priority')
     .sort((a, b) => a.index - b.index)
     .forEach((match) => {
       if (match.index < cursor) return;
       if (match.index > cursor) parts.push(<span key={`t-${cursor}`}>{line.slice(cursor, match.index)}</span>);
       parts.push(
-        <mark key={`m-${match.index}`} className="deadlineHighlight">
-          {line.slice(match.index, match.end)}
+        <mark key={`m-${match.index}`} className={match.kind === 'priority' ? 'priorityHighlight' : 'deadlineHighlight'}>
+          {match.kind === 'priority' ? `[${line.slice(match.index, match.end)}]` : line.slice(match.index, match.end)}
         </mark>,
       );
       cursor = match.end;
@@ -1730,8 +1794,9 @@ function TaskDetailSheet({ task, lists, onClose, onUpdate, onDelete, onDuplicate
 }
 
 function MemoScreen(props) {
-  const { memos, search, blasting, selectMode, selection, onSearch, onNew, onOpen, onSelectMode, onCancelSelect, onToggleSelect, onDeleteSelected, onDeleteMemo } = props;
+  const { memos, search, memoSize, blasting, selectMode, selection, onSearch, onSetMemoSize, onNew, onOpen, onSelectMode, onCancelSelect, onToggleSelect, onDeleteSelected, onDeleteMemo } = props;
   const [memoSwipe, setMemoSwipe] = useState(null);
+  const [sizeOpen, setSizeOpen] = useState(false);
   const swipeDeletedRef = useRef(false);
   const memoTouchRef = useRef(null);
   const ignoreMemoTapRef = useRef(false);
@@ -1772,11 +1837,27 @@ function MemoScreen(props) {
           </>
         ) : (
           <>
+            <div className="memoSizeControl">
+              <button className="textButton" onClick={() => setSizeOpen(!sizeOpen)}>文字</button>
+              {sizeOpen && (
+                <div className="memoSizeMenu">
+                  {[
+                    ['small', '小'],
+                    ['standard', '標準'],
+                    ['large', '大'],
+                  ].map(([id, label]) => (
+                    <button key={id} className={memoSize === id ? 'selected' : ''} onClick={() => { onSetMemoSize(id); setSizeOpen(false); }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button className="textButton" onClick={onSelectMode}>選択</button>
           </>
         )}
       </div>
-      <div className="memoList">
+      <div className={`memoList memoSize-${memoSize}`}>
         {memos.length === 0 ? (
           <div className="emptyState">
             <Notebook size={28} />
@@ -1809,7 +1890,7 @@ function MemoScreen(props) {
               {selectMode && <input type="checkbox" checked={selection.has(memo.id)} onChange={() => onToggleSelect(memo.id)} onClick={(event) => event.stopPropagation()} />}
               <div>
                 <strong>{memoTitle(memo)}</strong>
-                <p>{memo.body.replace(/\s+/g, ' ').trim() || '本文なし'}</p>
+                <p>{stripMemoHeadingMarkers(memo.body).replace(/\s+/g, ' ').trim() || '本文なし'}</p>
               </div>
             </article>
           ))
@@ -1825,7 +1906,9 @@ function MemoScreen(props) {
 }
 
 function MemoEditor({ memo, onSave, onDraft }) {
-  const [body, setBody] = useState(memo?.body || '');
+  const parsedMemo = useMemo(() => parseMemoEditorBody(memo?.body || ''), [memo?.body]);
+  const [body, setBody] = useState(parsedMemo.visibleBody);
+  const [headingLines, setHeadingLines] = useState(parsedMemo.headingLines);
   const [textPast, setTextPast] = useState([]);
   const [textFuture, setTextFuture] = useState([]);
   const [dragX, setDragX] = useState(0);
@@ -1835,9 +1918,10 @@ function MemoEditor({ memo, onSave, onDraft }) {
   const memoId = memo?.id || 'new';
   const touchStartRef = useRef(null);
   const textareaRef = useRef(null);
+  const serializedBody = useMemo(() => serializeMemoEditorBody(body, headingLines), [body, headingLines]);
   useEffect(() => {
-    onDraft({ memoId, body });
-  }, [memoId, body, onDraft]);
+    onDraft({ memoId, body: serializedBody });
+  }, [memoId, serializedBody, onDraft]);
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -1861,7 +1945,7 @@ function MemoEditor({ memo, onSave, onDraft }) {
   const save = () => {
     setDragX(window.innerWidth);
     setClosing(true);
-    window.setTimeout(() => onSave(memoId, body), 160);
+    window.setTimeout(() => onSave(memoId, serializedBody), 160);
   };
   const changeBody = (value) => {
     setTextPast((past) => [...past.slice(-49), body]);
@@ -1884,6 +1968,17 @@ function MemoEditor({ memo, onSave, onDraft }) {
       setTextPast((past) => [...past.slice(-49), body]);
       setBody(next);
       return future.slice(1);
+    });
+  };
+  const toggleHeading = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const lineIndex = body.slice(0, textarea.selectionStart).split('\n').length - 1;
+    setHeadingLines((current) => {
+      const next = new Set(current);
+      if (next.has(lineIndex)) next.delete(lineIndex);
+      else next.add(lineIndex);
+      return next;
     });
   };
   return (
@@ -1918,8 +2013,21 @@ function MemoEditor({ memo, onSave, onDraft }) {
       <button className="editorBackButton" onClick={save} aria-label="保存して戻る">
         <ArrowLeft size={24} />
       </button>
-      <textarea ref={textareaRef} className="memoEditorInput" value={body} onChange={(event) => changeBody(event.target.value)} placeholder="メモを書く" autoFocus />
+      <div className="memoEditorTextWrap">
+        <div className="memoEditorMirror" aria-hidden="true">
+          {body.split('\n').map((line, index) => (
+            <React.Fragment key={`${index}-${line}`}>
+              <span className={headingLines.has(index) ? 'memoHeadingLine' : ''}>{line || ' '}</span>
+              {'\n'}
+            </React.Fragment>
+          ))}
+        </div>
+        <textarea ref={textareaRef} className="memoEditorInput" value={body} onChange={(event) => changeBody(event.target.value)} placeholder="メモを書く" autoFocus />
+      </div>
       <div className="editorFloatingHistory">
+        <button className="textButton editorHeadingButton" onClick={toggleHeading}>
+          見出し
+        </button>
         <button className="iconButton" onClick={undoText} disabled={textPast.length === 0} aria-label="戻る">
           <Undo2 size={20} />
         </button>
@@ -1965,178 +2073,10 @@ function SettingsScreen({ taskCount, memoCount, onDeleteTasks, onDeleteMemos, on
   );
 }
 
-const FOCUS_MODES = {
-  work: { label: '集中', minutes: 25 },
-  short: { label: '短い休憩', minutes: 5 },
-  long: { label: '長い休憩', minutes: 15 },
-};
-
-function FocusScreen() {
-  const [mode, setMode] = useState('work');
-  const [running, setRunning] = useState(false);
-  const [remaining, setRemaining] = useState(FOCUS_MODES.work.minutes * 60);
-  const [notificationStatus, setNotificationStatus] = useState(() => ('Notification' in window ? Notification.permission : 'unsupported'));
-  const endAtRef = useRef(null);
-  const notifiedRef = useRef(false);
-  const total = FOCUS_MODES[mode].minutes * 60;
-  const progress = total ? 1 - remaining / total : 0;
-  const minutes = Math.floor(remaining / 60);
-  const seconds = remaining % 60;
-
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(FOCUS_TIMER_KEY) || '{}');
-      if (!FOCUS_MODES[saved.mode]) return;
-      const savedTotal = FOCUS_MODES[saved.mode].minutes * 60;
-      setMode(saved.mode);
-      if (saved.running && saved.endAt) {
-        const next = Math.max(0, Math.ceil((saved.endAt - Date.now()) / 1000));
-        setRemaining(next || savedTotal);
-        if (next > 0) {
-          endAtRef.current = saved.endAt;
-          setRunning(true);
-        }
-      } else if (Number.isFinite(saved.remaining)) {
-        setRemaining(Math.min(saved.remaining, savedTotal));
-      }
-    } catch {}
-  }, []);
-
-  const persistTimer = (next) => {
-    localStorage.setItem(FOCUS_TIMER_KEY, JSON.stringify(next));
-  };
-
-  const notifyFinished = async (label) => {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const title = 'Tasktori';
-    const options = {
-      body: `${label}が終わりました`,
-      tag: 'tasktori-pomodoro',
-      renotify: true,
-      requireInteraction: true,
-      icon: `${import.meta.env.BASE_URL}icons/icon-192.svg`,
-      badge: `${import.meta.env.BASE_URL}icons/icon-192.svg`,
-    };
-    try {
-      const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.ready : null;
-      if (registration?.showNotification) {
-        await registration.showNotification(title, options);
-      } else {
-        new Notification(title, options);
-      }
-    } catch {
-      try {
-        new Notification(title, options);
-      } catch {}
-    }
-  };
-
-  const requestNotification = async () => {
-    if (!('Notification' in window)) {
-      setNotificationStatus('unsupported');
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    setNotificationStatus(permission);
-  };
-
-  useEffect(() => {
-    if (!running) return;
-    const tick = () => {
-      const next = Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000));
-      setRemaining(next);
-      if (next === 0) {
-        setRunning(false);
-        endAtRef.current = null;
-        persistTimer({ mode, running: false, remaining: total });
-        playCompleteSound();
-        if (!notifiedRef.current) {
-          notifiedRef.current = true;
-          notifyFinished(FOCUS_MODES[mode].label);
-        }
-      }
-    };
-    tick();
-    const timer = window.setInterval(tick, 250);
-    return () => window.clearInterval(timer);
-  }, [mode, running, total]);
-
-  const selectMode = (nextMode) => {
-    setMode(nextMode);
-    setRunning(false);
-    endAtRef.current = null;
-    notifiedRef.current = false;
-    const nextRemaining = FOCUS_MODES[nextMode].minutes * 60;
-    setRemaining(nextRemaining);
-    persistTimer({ mode: nextMode, running: false, remaining: nextRemaining });
-  };
-  const start = () => {
-    const nextRemaining = remaining <= 0 ? total : remaining;
-    if (remaining <= 0) setRemaining(total);
-    endAtRef.current = Date.now() + nextRemaining * 1000;
-    notifiedRef.current = false;
-    persistTimer({ mode, running: true, remaining: nextRemaining, endAt: endAtRef.current });
-    setRunning(true);
-    playTickSound();
-  };
-  const pause = () => {
-    const nextRemaining = endAtRef.current ? Math.max(0, Math.ceil((endAtRef.current - Date.now()) / 1000)) : remaining;
-    setRunning(false);
-    endAtRef.current = null;
-    setRemaining(nextRemaining);
-    persistTimer({ mode, running: false, remaining: nextRemaining });
-  };
-  const reset = () => {
-    setRunning(false);
-    endAtRef.current = null;
-    notifiedRef.current = false;
-    setRemaining(total);
-    persistTimer({ mode, running: false, remaining: total });
-  };
-
-  return (
-    <main className="focusView">
-      <section className="pomodoroPanel">
-        <div className="timerRing" style={{ '--progress': `${progress * 360}deg` }}>
-          <div>
-            <span>{pad(minutes)}:{pad(seconds)}</span>
-            <small>{FOCUS_MODES[mode].label}</small>
-          </div>
-        </div>
-        <div className="focusActions">
-          {running ? (
-            <button className="primaryAction" onClick={pause}>一時停止</button>
-          ) : (
-            <button className="primaryAction" onClick={start}>開始</button>
-          )}
-          <button className="textButton" onClick={reset}>リセット</button>
-        </div>
-        {notificationStatus !== 'granted' && (
-          <button className="notifyButton" onClick={requestNotification} disabled={notificationStatus === 'denied' || notificationStatus === 'unsupported'}>
-            {notificationStatus === 'denied'
-              ? '通知は端末設定で許可'
-              : notificationStatus === 'unsupported'
-                ? '通知非対応'
-                : '通知を許可'}
-          </button>
-        )}
-        <div className="focusModeTabs" aria-label="集中モード">
-          {Object.entries(FOCUS_MODES).map(([id, item]) => (
-            <button key={id} className={mode === id ? 'active' : ''} onClick={() => selectMode(id)}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </section>
-    </main>
-  );
-}
-
 function BottomTabs({ activeTab, onSwitch }) {
   const tabs = [
     { id: 'tasks', label: 'タスク', icon: ListChecks },
     { id: 'memos', label: 'メモ', icon: FileText },
-    { id: 'focus', label: '集中', icon: Focus },
     { id: 'settings', label: '設定', icon: Settings },
   ];
   return (

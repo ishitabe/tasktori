@@ -721,6 +721,13 @@ button {
   color: #075f8c;
 }
 
+.priorityHighlight {
+  padding: 1px 3px;
+  border-radius: 5px;
+  background: #e0f4ff;
+  color: #0b80b8;
+}
+
 .recognitionPanel,
 .registrationPreview {
   display: grid;
@@ -899,7 +906,7 @@ button {
 
 .priorityPicker {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
@@ -1313,10 +1320,6 @@ button {
   backdrop-filter: blur(12px);
 }
 
-.memoToolbar:has(.searchBox + .textButton:last-child) {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
 .searchBox {
   min-width: 0;
   min-height: 44px;
@@ -1339,12 +1342,12 @@ button {
 }
 
 .memoItem {
-  min-height: 74px;
+  min-height: 62px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  padding: 12px;
+  padding: 9px 10px;
 }
 
 .memoItem input {
@@ -1362,12 +1365,63 @@ button {
 
 .memoItem strong {
   display: block;
+  font-size: 0.96rem;
+  line-height: 1.25;
 }
 
 .memoItem p {
-  margin: 5px 0 0;
+  margin: 3px 0 0;
   color: #5c7d90;
+  font-size: 0.8rem;
+}
+
+.memoSize-small .memoItem strong {
   font-size: 0.88rem;
+}
+
+.memoSize-small .memoItem p {
+  font-size: 0.74rem;
+}
+
+.memoSize-large .memoItem strong {
+  font-size: 1.05rem;
+}
+
+.memoSize-large .memoItem p {
+  font-size: 0.9rem;
+}
+
+.memoSizeControl {
+  position: relative;
+}
+
+.memoSizeMenu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 25;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(147, 211, 244, 0.55);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 26px rgba(49, 128, 168, 0.14);
+}
+
+.memoSizeMenu button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #eef9ff;
+  color: #0b80b8;
+  font-weight: 850;
+}
+
+.memoSizeMenu button.selected {
+  background: #bfeaff;
+  color: #07344d;
 }
 
 .memoEditorView {
@@ -1410,18 +1464,48 @@ button {
   box-shadow: 0 8px 22px rgba(49, 128, 168, 0.14);
 }
 
+.memoEditorTextWrap {
+  position: relative;
+}
+
+.memoEditorMirror,
 .memoEditorInput {
   width: 100%;
   min-height: 160px;
   padding: 78px 10px 24px;
+  color: #102a38;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.memoEditorMirror {
+  pointer-events: none;
+}
+
+.memoHeadingLine {
+  font-size: 1.16em;
+  font-weight: 900;
+  line-height: 1.8;
+}
+
+.memoEditorInput {
+  position: absolute;
+  inset: 0;
   border: 0;
   border-radius: 0;
-  background: #ffffff;
-  color: #102a38;
-  line-height: 1.6;
+  background: transparent;
+  color: transparent;
+  caret-color: #0b80b8;
   resize: none;
   overflow: hidden;
   outline: 0;
+}
+
+.memoEditorInput::placeholder {
+  color: #7aa8bf;
 }
 
 .editorFloatingHistory {
@@ -1440,6 +1524,12 @@ button {
 .editorFloatingHistory .iconButton {
   width: 40px;
   height: 40px;
+  box-shadow: none;
+}
+
+.editorHeadingButton {
+  min-height: 40px;
+  padding: 0 10px;
   box-shadow: none;
 }
 
@@ -1482,116 +1572,6 @@ button {
   font-weight: 700;
 }
 
-.focusView {
-  width: min(100%, 680px);
-  margin: 0 auto;
-  padding: 14px;
-  min-height: calc(100dvh - 150px);
-}
-
-.focusModeTabs {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  width: min(100%, 380px);
-  margin: 4px auto 0;
-  padding: 6px;
-  border-radius: 14px;
-  background: rgba(238, 249, 255, 0.82);
-}
-
-.focusModeTabs button {
-  min-height: 40px;
-  border: 0;
-  border-radius: 8px;
-  background: #eef9ff;
-  color: #0b80b8;
-  font-weight: 850;
-}
-
-.focusModeTabs button.active {
-  background: #bfeaff;
-  color: #07344d;
-}
-
-.pomodoroPanel {
-  display: grid;
-  place-items: center;
-  gap: 24px;
-  padding: 36px 12px 24px;
-}
-
-.timerRing {
-  --progress: 0deg;
-  width: min(76vw, 300px);
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at center, #ffffff 0 61%, transparent 62%),
-    conic-gradient(#42b9ed var(--progress), #e6f6ff 0);
-  box-shadow: 0 18px 44px rgba(49, 128, 168, 0.16);
-}
-
-.timerRing > div {
-  width: 74%;
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 8px;
-  border-radius: 50%;
-  background: #ffffff;
-  color: #102a38;
-}
-
-.timerRing span {
-  font-size: clamp(2.7rem, 15vw, 4.6rem);
-  font-weight: 900;
-  line-height: 1;
-}
-
-.timerRing small {
-  color: #0b80b8;
-  font-weight: 850;
-}
-
-.focusActions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.notifyButton {
-  min-height: 38px;
-  border: 0;
-  border-radius: 999px;
-  padding: 0 14px;
-  background: #eef9ff;
-  color: #0b80b8;
-  font-size: 0.84rem;
-  font-weight: 850;
-}
-
-.notifyButton:disabled {
-  color: #7893a2;
-  background: #f0f4f6;
-}
-
-.primaryAction {
-  min-width: 132px;
-  min-height: 48px;
-  border: 0;
-  border-radius: 999px;
-  background: #0b80b8;
-  color: #ffffff;
-  font-size: 1rem;
-  font-weight: 900;
-  box-shadow: 0 12px 28px rgba(11, 128, 184, 0.22);
-}
-
 .bottomTabs {
   position: fixed;
   left: 0;
@@ -1599,7 +1579,7 @@ button {
   bottom: 0;
   z-index: 35;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
   border-top: 1px solid rgba(58, 160, 210, 0.16);
